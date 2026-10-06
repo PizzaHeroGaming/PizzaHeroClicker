@@ -294,6 +294,15 @@ version comes from `<Version>` in the `.csproj`. The installer:
 - installs over an older version when run again (close the app first; Setup will ask),
 - leaves profiles and settings in `%APPDATA%\PizzaHeroClicker` alone when uninstalled.
 
+## Download
+
+**[Download the latest installer](https://github.com/PizzaHeroGaming/PizzaHeroClicker/releases/latest/download/PizzaHeroClicker-Setup.exe)**
+(Windows 10 or 11, 64-bit). That link always fetches the newest version. Older versions and release
+notes are on the [releases page](https://github.com/PizzaHeroGaming/PizzaHeroClicker/releases).
+
+The installer is not code-signed yet, so Windows may show "Windows protected your PC": choose
+**More info**, then **Run anyway**.
+
 ## Updates
 
 The app looks at this project's [GitHub releases](https://github.com/PizzaHeroGaming/PizzaHeroClicker/releases)
@@ -319,6 +328,8 @@ This builds the installer and publishes it as release `v<version>` (needs the Gi
 with `gh auth login`). Add `-Draft` to look it over before it goes live, or `-NotesFile notes.md`
 to write your own release notes. The app only offers an installer named
 `PizzaHeroClicker-Setup-<version>.exe` attached to a release in this repository, so keep that name.
+The script also attaches the same file as `PizzaHeroClicker-Setup.exe`, which is what the
+download link above points at.
 
 ## Profile format
 

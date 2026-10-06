@@ -45,7 +45,13 @@ $setup = Join-Path $PSScriptRoot "output\PizzaHeroClicker-Setup-$version.exe"
 if (-not (Test-Path $setup)) { throw "The installer was not built: $setup" }
 Write-Host "SHA-256: $((Get-FileHash $setup -Algorithm SHA256).Hash.ToLower())"
 
-$arguments = @('release', 'create', $tag, $setup, '--repo', $repo, '--target', $commit, '--title', "Pizza Hero Clicker $tag")
+# A second copy under a name that never changes, so one link always downloads the newest version:
+# https://github.com/PizzaHeroGaming/PizzaHeroClicker/releases/latest/download/PizzaHeroClicker-Setup.exe
+# (The app's updater uses the versioned file and ignores this one.)
+$stable = Join-Path $PSScriptRoot 'output\PizzaHeroClicker-Setup.exe'
+Copy-Item $setup $stable -Force
+
+$arguments = @('release', 'create', $tag, $setup, $stable, '--repo', $repo, '--target', $commit, '--title', "Pizza Hero Clicker $tag")
 if ($NotesFile) { $arguments += @('--notes-file', $NotesFile) } else { $arguments += '--generate-notes' }
 if ($Draft) { $arguments += '--draft' }
 gh @arguments
