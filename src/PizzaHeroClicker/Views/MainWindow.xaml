@@ -1,0 +1,232 @@
+<Window x:Class="PizzaHeroClicker.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:PizzaHeroClicker.Views"
+        Title="Pizza Hero Clicker" Width="1080" Height="720" MinWidth="1040" MinHeight="600"
+        WindowStartupLocation="CenterScreen" Style="{StaticResource AppWindow}">
+
+  <Window.InputBindings>
+    <KeyBinding Modifiers="Control" Key="S" Command="{Binding SaveProfileCommand}" />
+  </Window.InputBindings>
+
+  <Window.Resources>
+    <Style x:Key="GoButton" TargetType="Button" BasedOn="{StaticResource ChunkyButton}">
+      <Setter Property="Background" Value="{StaticResource BasilDarkBrush}" />
+      <Setter Property="BorderBrush" Value="#27500F" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontSize" Value="19" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Height" Value="58" />
+      <Setter Property="Margin" Value="0,0,0,8" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding IsActive}" Value="True">
+          <Setter Property="Background" Value="{StaticResource TomatoBrush}" />
+          <Setter Property="BorderBrush" Value="{StaticResource TomatoDarkBrush}" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="StatePill" TargetType="Border">
+      <Setter Property="Background" Value="{StaticResource InputBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="8,12" />
+      <Setter Property="Margin" Value="0,0,0,10" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding StateKind}" Value="Running">
+          <Setter Property="Background" Value="{StaticResource BasilDarkBrush}" />
+          <Setter Property="BorderBrush" Value="{StaticResource BasilBrush}" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding StateKind}" Value="Countdown">
+          <Setter Property="Background" Value="{StaticResource CheeseDarkBrush}" />
+          <Setter Property="BorderBrush" Value="{StaticResource CheeseBrush}" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding StateKind}" Value="Paused">
+          <Setter Property="Background" Value="{StaticResource PanelAltBrush}" />
+          <Setter Property="BorderBrush" Value="{StaticResource CheeseBrush}" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding StateKind}" Value="Waiting">
+          <Setter Property="Background" Value="{StaticResource PanelAltBrush}" />
+          <Setter Property="BorderBrush" Value="{StaticResource CrustBrush}" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="StatName" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="Margin" Value="0,3" />
+    </Style>
+    <Style x:Key="StatValue" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource CheeseBrush}" />
+      <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="Margin" Value="0,3" />
+    </Style>
+  </Window.Resources>
+
+  <Grid x:Name="Root" Margin="14">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <!-- Header -->
+    <DockPanel Grid.Row="0" Margin="0,0,0,12" LastChildFill="False">
+      <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+        <!-- Pizza slice logo -->
+        <Canvas Width="34" Height="34" Margin="0,0,10,0" VerticalAlignment="Center">
+          <Path Fill="{StaticResource CrustBrush}" Data="M2,6 Q17,-3 32,6 L17,33 Z" />
+          <Path Fill="{StaticResource CheeseBrush}" Data="M5.5,9 Q17,3 28.5,9 L17,30 Z" />
+          <Ellipse Fill="{StaticResource TomatoBrush}" Width="6" Height="6" Canvas.Left="10" Canvas.Top="10" />
+          <Ellipse Fill="{StaticResource TomatoBrush}" Width="5" Height="5" Canvas.Left="18" Canvas.Top="13" />
+          <Ellipse Fill="{StaticResource TomatoBrush}" Width="4" Height="4" Canvas.Left="14.5" Canvas.Top="20" />
+        </Canvas>
+        <TextBlock Text="PIZZA HERO" FontFamily="{StaticResource HeadFont}" FontWeight="Bold" FontSize="22"
+                   Foreground="{StaticResource CheeseBrush}" VerticalAlignment="Center" />
+        <TextBlock Text=" CLICKER" FontFamily="{StaticResource HeadFont}" FontWeight="Bold" FontSize="22"
+                   Foreground="{StaticResource TomatoBrush}" VerticalAlignment="Center" />
+      </StackPanel>
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+        <TextBlock Style="{StaticResource InlineLabel}" Text="GAME" FontFamily="{StaticResource HeadFont}" FontWeight="Bold"
+                   Foreground="{StaticResource DimBrush}" />
+        <ComboBox ItemsSource="{Binding GameNames}" SelectedItem="{Binding SelectedGame}" Width="170" MaxDropDownHeight="360"
+                  ToolTip="Profiles are grouped by game. Picking a game opens its first profile." />
+        <TextBlock Style="{StaticResource InlineLabel}" Text="PROFILE" FontFamily="{StaticResource HeadFont}" FontWeight="Bold"
+                   Foreground="{StaticResource DimBrush}" Margin="12,0,8,0" />
+        <ComboBox ItemsSource="{Binding ProfileNames}" SelectedItem="{Binding SelectedProfileName}" Width="190" MaxDropDownHeight="360" />
+        <Button Command="{Binding SaveProfileCommand}" Content="{Binding SaveButtonText}" Margin="8,0,0,0" MinWidth="86"
+                ToolTip="Save this profile (Ctrl+S). Red means there are unsaved changes.">
+          <Button.Style>
+            <Style TargetType="Button" BasedOn="{StaticResource ChunkyButton}">
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsDirty}" Value="True">
+                  <Setter Property="Background" Value="{StaticResource TomatoBrush}" />
+                  <Setter Property="BorderBrush" Value="{StaticResource TomatoDarkBrush}" />
+                  <Setter Property="Foreground" Value="White" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Button.Style>
+        </Button>
+        <Button x:Name="ProfileMenuButton" Content="MANAGE ▾" Margin="8,0,0,0" Click="OnProfileMenuClick">
+          <Button.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="Save" Command="{Binding SaveProfileCommand}" />
+              <MenuItem Header="Revert to saved…" Command="{Binding RevertProfileCommand}" />
+              <MenuItem Header="New profile in this game…" Command="{Binding NewProfileCommand}" />
+              <MenuItem Header="New game…" Command="{Binding NewGameCommand}" />
+              <MenuItem Header="Rename profile…" Command="{Binding RenameProfileCommand}" />
+              <MenuItem Header="Move profile to another game…" Command="{Binding MoveProfileCommand}" />
+              <MenuItem Header="Rename this game…" Command="{Binding RenameGameCommand}" />
+              <MenuItem Header="Duplicate…" Command="{Binding DuplicateProfileCommand}" />
+              <MenuItem Header="Delete…" Command="{Binding DeleteProfileCommand}" />
+              <MenuItem Header="Import from file…" Command="{Binding ImportProfileCommand}" />
+              <MenuItem Header="Export to file…" Command="{Binding ExportProfileCommand}" />
+            </ContextMenu>
+          </Button.ContextMenu>
+        </Button>
+      </StackPanel>
+    </DockPanel>
+
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="290" />
+        <ColumnDefinition Width="12" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <!-- Left column: run control and live status -->
+      <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Focusable="False">
+        <StackPanel>
+          <Border Style="{StaticResource Card}">
+            <StackPanel>
+              <Border Style="{StaticResource StatePill}">
+                <TextBlock Text="{Binding StateText}" HorizontalAlignment="Center" FontFamily="{StaticResource HeadFont}"
+                           FontWeight="Bold" FontSize="21" />
+              </Border>
+              <Button Style="{StaticResource GoButton}" Command="{Binding ToggleRunCommand}" Content="{Binding ToggleText}" />
+              <Button Command="{Binding PauseCommand}" Content="{Binding PauseText}" IsEnabled="{Binding IsActive}"
+                      Margin="0" Height="34" />
+            </StackPanel>
+          </Border>
+
+          <Border Style="{StaticResource Card}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Style="{StaticResource CardTitle}" Text="LIVE STATS" />
+              <TextBlock Grid.Row="1" Style="{StaticResource StatName}" Text="Clicks this run" />
+              <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource StatValue}" Text="{Binding ClickCount, StringFormat=N0}" />
+              <TextBlock Grid.Row="2" Style="{StaticResource StatName}" Text="Actions this run" />
+              <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource StatValue}" Text="{Binding ActionCount, StringFormat=N0}" />
+              <TextBlock Grid.Row="3" Style="{StaticResource StatName}" Text="Actual clicks / sec" />
+              <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource StatValue}" Text="{Binding CpsText}" />
+              <TextBlock Grid.Row="4" Style="{StaticResource StatName}" Text="Next action in" />
+              <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource StatValue}" Text="{Binding NextText}" />
+              <TextBlock Grid.Row="5" Style="{StaticResource StatName}" Text="Run time" />
+              <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource StatValue}" Text="{Binding RunTimeText}" />
+              <TextBlock Grid.Row="6" Style="{StaticResource StatName}" Text="Clicks this session" />
+              <TextBlock Grid.Row="6" Grid.Column="1" Style="{StaticResource StatValue}" Text="{Binding SessionClicks, StringFormat=N0}" />
+            </Grid>
+          </Border>
+
+          <Border Style="{StaticResource Card}" BorderBrush="{StaticResource CheeseDarkBrush}">
+            <TextBlock Style="{StaticResource Hint}"
+                       Text="Heads up: some games and anti-cheat systems block or penalise automated input. Check a game's rules before using this with it." />
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- Right column: settings -->
+      <TabControl x:Name="Tabs" Grid.Column="2">
+        <TabItem Header="CLICKER">
+          <views:ClickerTab />
+        </TabItem>
+        <TabItem Header="ACTIONS">
+          <views:ActionsTab />
+        </TabItem>
+        <TabItem Header="WINDOW">
+          <views:WindowTab />
+        </TabItem>
+        <TabItem Header="HOTKEYS">
+          <views:HotkeysTab />
+        </TabItem>
+        <TabItem Header="SETTINGS">
+          <views:SettingsTab />
+        </TabItem>
+        <TabItem Header="HOW TO USE">
+          <views:HelpTab />
+        </TabItem>
+        <TabItem Header="{Binding AboutHeader}">
+          <views:AboutTab />
+        </TabItem>
+      </TabControl>
+    </Grid>
+
+    <!-- Footer: last event on the left, anything blocking a start on the right -->
+    <Border Grid.Row="2" Margin="0,4,0,0" Padding="12,7" CornerRadius="10" Background="{StaticResource PanelBrush}"
+            BorderBrush="{StaticResource LineBrush}" BorderThickness="2">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Left" Text="{Binding Footer}" Foreground="{StaticResource DimBrush}"
+                   TextTrimming="CharacterEllipsis" MaxWidth="420" />
+        <TextBlock Text="{Binding ValidationMessage}" Foreground="{StaticResource TomatoBrush}" FontWeight="SemiBold"
+                   HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" Margin="16,0,0,0"
+                   ToolTip="{Binding ValidationMessage}" />
+      </DockPanel>
+    </Border>
+  </Grid>
+</Window>

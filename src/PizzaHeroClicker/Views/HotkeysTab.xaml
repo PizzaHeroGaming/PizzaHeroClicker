@@ -1,0 +1,74 @@
+<UserControl x:Class="PizzaHeroClicker.Views.HotkeysTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:PizzaHeroClicker.Controls"
+             xmlns:models="clr-namespace:PizzaHeroClicker.Models">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+    <StackPanel Margin="0,0,4,0">
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="GLOBAL HOTKEYS" />
+          <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,10"
+                     Text="These work while the app is in the background or a game is fullscreen. Click a box, then press the new key. Esc cancels, Backspace clears." />
+
+          <Grid x:Name="HotkeyGrid">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="190" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Style="{StaticResource InlineLabel}" Text="Start / stop" />
+            <controls:HotkeyBox Grid.Row="0" Grid.Column="1" Margin="0,3" Combo="{Binding Profile.Hotkeys.Toggle}" />
+
+            <TextBlock Grid.Row="1" Style="{StaticResource InlineLabel}" Text="Start / stop behaviour" />
+            <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,3" Width="170"
+                      ItemsSource="{x:Static models:EnumValues.HotkeyModes}" SelectedItem="{Binding Profile.Hotkeys.Mode}" />
+            <TextBlock Grid.Row="1" Grid.Column="2" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="12,0,0,0"
+                       Text="Toggle: press to start, press again to stop. Hold: runs only while the key is held (no countdown)." />
+
+            <TextBlock Grid.Row="2" Style="{StaticResource InlineLabel}" Text="Pause / resume" />
+            <controls:HotkeyBox Grid.Row="2" Grid.Column="1" Margin="0,3" Combo="{Binding Profile.Hotkeys.Pause}" />
+
+            <TextBlock Grid.Row="3" Style="{StaticResource InlineLabel}" Text="Capture position" />
+            <controls:HotkeyBox Grid.Row="3" Grid.Column="1" Margin="0,3" Combo="{Binding Profile.Hotkeys.Capture}" />
+            <TextBlock Grid.Row="3" Grid.Column="2" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="12,0,0,0"
+                       Text="Adds a click action at the cursor's position." />
+
+            <TextBlock Grid.Row="4" Style="{StaticResource InlineLabel}" Text="Emergency stop" />
+            <controls:HotkeyBox Grid.Row="4" Grid.Column="1" Margin="0,3" Combo="{Binding Profile.Hotkeys.Stop}" />
+            <TextBlock Grid.Row="4" Grid.Column="2" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="12,0,0,0"
+                       Text="Always stops the run, even in hold mode or mid-action." />
+
+            <TextBlock Grid.Row="6" Style="{StaticResource InlineLabel}" Text="Show position markers" />
+            <controls:HotkeyBox Grid.Row="6" Grid.Column="1" Margin="0,3" Combo="{Binding Profile.Hotkeys.Overlay}" />
+
+            <TextBlock Grid.Row="7" Style="{StaticResource InlineLabel}" Text="Record / stop recording" />
+            <controls:HotkeyBox Grid.Row="7" Grid.Column="1" Margin="0,3" Combo="{Binding Profile.Hotkeys.Record}" />
+
+            <TextBlock Grid.Row="5" Style="{StaticResource InlineLabel}" Text="Switch to this profile" />
+            <controls:HotkeyBox Grid.Row="5" Grid.Column="1" Margin="0,3" Combo="{Binding Profile.QuickSwitchHotkey}" />
+            <TextBlock Grid.Row="5" Grid.Column="2" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="12,0,0,0"
+                       Text="Optional. Loads this profile from anywhere, whichever profile is active." />
+          </Grid>
+
+          <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0" Text="Hotkeys are saved with the profile, so each game can have its own set." />
+          <TextBlock Style="{StaticResource Warning}" Margin="0,8,0,0" Text="{Binding HotkeyWarning}"
+                     Visibility="{Binding HotkeyWarning, Converter={StaticResource TextToVis}}" />
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

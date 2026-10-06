@@ -1,0 +1,27 @@
+<Window x:Class="PizzaHeroClicker.Views.PickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" Topmost="True"
+        ShowInTaskbar="False" ShowActivated="False" Focusable="False" ResizeMode="NoResize"
+        SizeToContent="WidthAndHeight" WindowStartupLocation="Manual" Left="-10000" Top="-10000"
+        Foreground="{StaticResource TextBrush}" FontFamily="{StaticResource BodyFont}" FontSize="12">
+  <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource CheeseBrush}" BorderThickness="2"
+          CornerRadius="10" Padding="8">
+    <StackPanel>
+      <!-- 11 x 11 screen pixels, magnified 12x; the outlined square is the pixel under the cursor -->
+      <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="1" HorizontalAlignment="Center">
+        <Grid Width="132" Height="132">
+          <Image x:Name="Zoom" Stretch="Fill" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+          <Rectangle Width="14" Height="14" Stroke="Black" StrokeThickness="1" />
+          <Rectangle Width="12" Height="12" Stroke="White" StrokeThickness="1" />
+        </Grid>
+      </Border>
+      <StackPanel Orientation="Horizontal" Margin="0,6,0,2">
+        <Border x:Name="Swatch" Width="16" Height="16" CornerRadius="4" BorderBrush="{StaticResource LineBrush}"
+                BorderThickness="1" Margin="0,0,6,0" />
+        <TextBlock x:Name="Info" FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center" />
+      </StackPanel>
+      <TextBlock x:Name="HintText" Foreground="{StaticResource DimBrush}" FontSize="11" Text="Click to pick · Esc cancels" />
+    </StackPanel>
+  </Border>
+</Window>

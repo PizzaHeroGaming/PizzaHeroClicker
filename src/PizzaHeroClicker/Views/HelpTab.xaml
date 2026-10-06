@@ -1,0 +1,117 @@
+<UserControl x:Class="PizzaHeroClicker.Views.HelpTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <UserControl.Resources>
+    <Style x:Key="Step" TargetType="TextBlock">
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+      <Setter Property="LineHeight" Value="19" />
+    </Style>
+  </UserControl.Resources>
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+    <StackPanel Margin="0,0,4,0">
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="CLICK REPEATEDLY IN ONE SPOT" />
+          <TextBlock Style="{StaticResource Step}" Text="1.  On the Clicker tab, set the interval between clicks and choose the mouse button." />
+          <TextBlock Style="{StaticResource Step}" Text="2.  Leave the Actions list empty." />
+          <TextBlock Style="{StaticResource Step}" Text="3.  Put the mouse where you want the clicks and press the Start / stop hotkey (F6 unless you changed it). After the countdown it clicks wherever the cursor is." />
+          <TextBlock Style="{StaticResource Step}" Text="4.  Press the same hotkey to stop." Margin="0" />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="RUN A SEQUENCE OF ACTIONS" />
+          <TextBlock Style="{StaticResource Step}" Text="1.  On the Actions tab press + ADD and pick a type: click, key press, wait, scroll, drag, move, or a pixel trigger." />
+          <TextBlock Style="{StaticResource Step}" Text="2.  Fill in the action. PICK ON SCREEN lets you click the spot instead of typing coordinates." />
+          <TextBlock Style="{StaticResource Step}" Text="3.  To add click positions quickly: hover over each spot and press the Capture hotkey (F8), or press CAPTURE CLICK and click the spot." />
+          <TextBlock Style="{StaticResource Step}" Text="4.  Drag rows to reorder. Untick a row to skip it without deleting it. Double-click a row to edit it." />
+          <TextBlock Style="{StaticResource Step}" Text="5.  Every action is followed by the interval from the Clicker tab, unless the action has its own Delay afterwards." />
+          <TextBlock Style="{StaticResource Step}" Text="6.  On the Clicker tab choose Sequential or Random order and, under When to stop, how the run ends." Margin="0" />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="RECORD AND PLAY BACK" />
+          <TextBlock Style="{StaticResource Step}" Text="1.  On the Actions tab press RECORD (or Ctrl+Shift+R), do the task, then press it again." />
+          <TextBlock Style="{StaticResource Step}" Text="2.  The recording becomes normal actions you can edit, with the real pauses stored as each action's delay." />
+          <TextBlock Style="{StaticResource Step}" Text="3.  To play it once, set When to stop to Loops with a count of 1. Leave jitter and glide at 0 for an exact replay." />
+          <TextBlock Style="{StaticResource Step}" Text="4.  Untick Record mouse movement to keep only clicks, keys and scrolling. Playback speed × makes it faster or slower." Margin="0" />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="WAIT FOR SOMETHING ON SCREEN" />
+          <TextBlock Style="{StaticResource Step}" Text="1.  Add a Pixel wait (pause until a colour appears) or Pixel click (click when it appears)." />
+          <TextBlock Style="{StaticResource Step}" Text="2.  Press EYEDROPPER and click the pixel to watch. Its position and colour are filled in." />
+          <TextBlock Style="{StaticResource Step}" Text="3.  Raise the tolerance if the colour varies slightly. Set a timeout and whether a timeout skips the action or stops the run." Margin="0" />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="CLICK THINGS THAT APPEAR IN AN AREA" />
+          <TextBlock Style="{StaticResource Step}" Text="For games where targets drift in and each kind needs a different button, for example left-click meteorites and right-click satellites." />
+          <TextBlock Style="{StaticResource Step}" Text="1.  On the Actions tab press + ADD, Area watch. Press SELECT AREA ON SCREEN and drag a box over the part of the game where targets appear. Leave out the planet, score and anything else that shares their colours." />
+          <TextBlock Style="{StaticResource Step}" Text="2.  With the game showing and a target visible, press + ADD A PICTURE OF A TARGET. The clicker's windows hide and the screen freezes; drag a snug box around one target. Choose Left or Right for that picture. Repeat for each kind of target (a meteorite, a satellite)." />
+          <TextBlock Style="{StaticResource Step}" Text="     Each thing in the area is separated from the backdrop and compared with your pictures by its mix of colours, so it does not matter which way up a target is or how big it is. On a plain backdrop anything that stands out is an object. On a busy one (a painted scene, a planet) the clicker learns the scene in the first two seconds and then treats whatever MOVES across it as an object." />
+          <TextBlock Style="{StaticResource Step}" Text="     If the game draws a marker on one kind of target, such as a red circle around every satellite, use + ADD A COLOUR on the marker instead of a picture. Anything carrying that colour gets that button, clicked at its centre. This is the most dependable way to tell two kinds apart." />
+          <TextBlock Style="{StaticResource Step}" Text="     Snip the whole target with a little of its surround. The picture may come from a different screen than the play field (a menu or preview with another background colour): a plain surround is recognised and left out. Avoid snipping a target on a surround the same colour as part of it." />
+          <TextBlock Style="{StaticResource Step}" Text="     Snipping inside a busy game works too, and is the best way to capture a target as the game really draws it. Select the area first, then press + ADD A PICTURE OF A TARGET while targets are flying: it watches for about three seconds, freezes, and after you drag the box it removes the scene behind the target (shown as green)." />
+          <TextBlock Style="{StaticResource Step}" Text="     Every kind of target needs its own picture. A kind without one is judged by whichever picture it happens to resemble most, which can be the wrong button. If a marker colour already identifies a kind (the red circle), do not also give that kind a picture." />
+          <TextBlock Style="{StaticResource Step}" Text="     Press TEST ON THE SCREEN NOW with targets visible: it shows how many objects it sees and how closely each picture matched, without clicking anything. Use it to set each picture's %." />
+          <TextBlock Style="{StaticResource Step}" Text="3.  Set Click first to where the planet is, so the most urgent target is dealt with first: Center if it sits in the middle of the area with targets coming from every side, otherwise the edge nearest it." />
+          <TextBlock Style="{StaticResource Step}" Text="4.  Make this the only action in the list, set a short interval on the Clicker tab (30 to 100 ms), and start with the hotkey. It clicks one target per pass and keeps going." />
+          <TextBlock Style="{StaticResource Step}" Text="     To do some set-up clicks first and then play one timed game: put the click actions above the Area watch, set the watch's Keep watching for to the length of the game (31000 for 31 seconds), and on the Clicker tab set When to stop to Loops with a count of 1. The clicks run once, the watch plays for that long, and the run stops." />
+          <TextBlock Style="{StaticResource Step}" Text="•  Targets missed: lower that picture's % to just under the likeness the test shows. Wrong things clicked: raise it. About 55% is a good start." />
+          <TextBlock Style="{StaticResource Step}" Text="•  On a busy backdrop, start the clicker a couple of seconds before targets matter, and keep score displays and timers out of the area if they get clicked. Something that stops moving for a few seconds is no longer seen." />
+          <TextBlock Style="{StaticResource Step}" Text="•  Stuck? Turn on Save what an Area watch sees (Settings, Troubleshooting), run once, and look at the snapshot folder: report.txt lists every object it saw and how it judged each one." />
+          <TextBlock Style="{StaticResource Step}" Text="•  Two targets with the same colours but different outlines: switch Recognise pictures by to Exact (about 85%). Exact needs targets that never rotate or change size." />
+          <TextBlock Style="{StaticResource Step}" Text="•  To have the watch start and stop with the game instead of running for a set time: press SNIP A START / STOP MARKER and drag a box around something that is always showing during the game and gone afterwards (a label such as Time Left). The watch waits for it to appear and only clicks while it is showing. The marker is checked again right before every click, so clicking stops the instant it disappears and nothing on the next screen gets clicked. Set Keep watching for to 0, or leave a number there as an upper limit." />
+          <TextBlock Style="{StaticResource Step}" Text="•  Choose a marker that vanishes the moment the game ends. If the screen that follows shows the same label, pick something else. As a second safeguard, once a watch has clicked something it never clicks on a different screen: if a quarter or more of the area suddenly changes (the game closed, a shop opened), it holds off, shows DIFFERENT SCREEN, and only carries on if the game screen comes back." />
+          <TextBlock Style="{StaticResource Step}" Text="•  After a click it leaves that spot alone for 400 ms (After a click, in the action), so a target that is already hit and fading out is not clicked again. Wasted clicks often break a combo. Raise it if hit targets linger longer than that." />
+          <TextBlock Style="{StaticResource Step}" Text="•  The game must be in windowed or borderless mode; exclusive fullscreen usually can't be read." Margin="0" />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="PROFILES AND SAVING" />
+          <TextBlock Style="{StaticResource Step}" Text="•  A profile holds everything: actions, intervals, hotkeys, target window and overlays." />
+          <TextBlock Style="{StaticResource Step}" Text="•  Profiles are grouped by game. Pick the game on the left of the header, then one of its profiles. MANAGE has New game, New profile in this game, and Move profile to another game (pick the game from a list, or choose + New game there). The same profile name can be used in different games." />
+          <TextBlock Style="{StaticResource Step}" Text="•  Profiles made before games existed sit under (No game). Select it and use MANAGE, Rename this game to file all of them under one game at once, or move them one at a time." />
+          <TextBlock Style="{StaticResource Step}" Text="•  Changes are NOT saved until you press SAVE (or Ctrl+S). The button turns red while there are unsaved changes." />
+          <TextBlock Style="{StaticResource Step}" Text="•  You can run a profile without saving it. You are asked about unsaved changes before switching profile or closing." />
+          <TextBlock Style="{StaticResource Step}" Text="•  MANAGE, Revert to saved throws away unsaved changes. Export writes the profile to a file you can share." Margin="0" />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="STOPPING AND STAYING SAFE" />
+          <TextBlock Style="{StaticResource Step}" Text="•  Start / stop hotkey (F6), Emergency stop hotkey (F9), or shove the mouse into an outer corner of the screen." />
+          <TextBlock Style="{StaticResource Step}" Text="•  Pause / resume (F7) holds a run without ending it." />
+          <TextBlock Style="{StaticResource Step}" Text="•  The clicker never clicks its own window. If the cursor is on it, the run waits until you move the mouse away." />
+          <TextBlock Style="{StaticResource Step}" Text="•  To keep a run inside one game, pick it on the Window tab. The run then pauses whenever that window loses focus." />
+          <TextBlock Style="{StaticResource Step}" Text="•  If the game runs as administrator, run the clicker as administrator too, or its clicks are ignored." Margin="0" />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="VERY FAST CLICKING (1 TO 5 MS)" />
+          <TextBlock Style="{StaticResource Step}" Text="•  Start and stop with the hotkey, not the START button, so the cursor is already on the target." />
+          <TextBlock Style="{StaticResource Step}" Text="•  Many programs and games can't process 1,000 clicks a second. They may lag, drop clicks, or keep reacting for a moment after you stop while they work through the backlog. If that happens, use a longer interval." />
+          <TextBlock Style="{StaticResource Step}" Text="•  Actual clicks / sec in Live stats shows what is really being sent." />
+          <TextBlock Style="{StaticResource Step}" Text="•  Maximum timing precision on the Settings tab tightens the timing at the cost of more CPU." Margin="0" />
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

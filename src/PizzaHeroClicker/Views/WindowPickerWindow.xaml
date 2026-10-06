@@ -1,0 +1,22 @@
+<Window x:Class="PizzaHeroClicker.Views.WindowPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Pick a target window" Style="{StaticResource AppWindow}" Width="560" Height="460"
+        MinWidth="420" MinHeight="300" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <Grid Margin="18">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,10"
+               Text="Open windows of other programs. If your game isn't listed, start it first and press Refresh." />
+    <ListBox x:Name="List" Grid.Row="1" DisplayMemberPath="Display" MouseDoubleClick="OnDoubleClick" />
+    <DockPanel Grid.Row="2" Margin="0,12,0,0" LastChildFill="False">
+      <Button DockPanel.Dock="Left" Content="REFRESH" Click="OnRefresh" />
+      <Button DockPanel.Dock="Right" Content="CANCEL" MinWidth="96" IsCancel="True" Margin="0" />
+      <Button DockPanel.Dock="Right" Content="USE WINDOW" Style="{StaticResource PrimaryButton}" MinWidth="110"
+              IsDefault="True" Click="OnAccept" />
+    </DockPanel>
+  </Grid>
+</Window>

@@ -1,0 +1,29 @@
+# Build output
+bin/
+obj/
+publish/
+artifacts/
+
+# IDE / user files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Test results
+TestResults/
+*.trx
+
+# Runtime data when running in portable mode from the build folder
+portable.flag
+/src/**/profiles/
+/src/**/logs/
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Installer build output
+/installer/output/
+/installer/staging/

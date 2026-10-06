@@ -1,0 +1,63 @@
+<UserControl x:Class="PizzaHeroClicker.Views.SettingsTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+    <StackPanel x:Name="Cards" Margin="0,0,4,0">
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="SAFETY" />
+          <CheckBox Content="Emergency stop when the mouse is pushed into a screen corner" IsChecked="{Binding Profile.CornerStop}" />
+          <TextBlock Style="{StaticResource Hint}" Margin="28,4,0,0"
+                     Text="Works on any monitor. Only true outer corners count, not the seams between two screens. Saved per profile. The emergency stop hotkey always works as well." />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="TIMING" />
+          <CheckBox Content="Maximum timing precision (uses more CPU)" IsChecked="{Binding Settings.PreciseTiming}" />
+          <TextBlock Style="{StaticResource Hint}" Margin="28,4,0,0"
+                     Text="Off: intervals are exact on average and about 95% of clicks land within a few microseconds; a 1 ms interval uses roughly a third of one CPU core. On: nearly every click is exact, but very short intervals keep one core busy. It makes no real difference above about 5 ms." />
+        </StackPanel>
+      </Border>
+
+      <Border x:Name="TrayCard" Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="SYSTEM TRAY" />
+          <CheckBox Content="Minimize to the system tray instead of the taskbar" IsChecked="{Binding Settings.MinimizeToTray}" Margin="0,0,0,8" />
+          <CheckBox Content="Start minimized" IsChecked="{Binding Settings.StartMinimized}" />
+          <TextBlock Style="{StaticResource Hint}" Margin="28,4,0,0"
+                     Text="Right-click the tray icon to start or stop and to switch profiles. Double-click it to bring this window back." />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="TROUBLESHOOTING" />
+          <CheckBox Content="Save what an Area watch sees while it runs" IsChecked="{Binding Settings.SaveAreaSnapshots}" />
+          <TextBlock Style="{StaticResource Hint}" Margin="28,4,0,8"
+                     Text="For working out why targets aren't being clicked. About once a second, for the first 40 seconds of a run, it saves a picture of the watched area and a note of what it recognised and clicked there, plus wider pictures (the area with a border around it) every few seconds and for eight seconds after the watch ends. A run that uses an Area watch replaces the previous recording. The pictures show whatever is on that part of your screen and stay on this PC. Turn it off when you are done." />
+          <Button Content="OPEN SNAPSHOT FOLDER" Command="{Binding OpenDebugFolderCommand}" HorizontalAlignment="Left" Margin="28,0,0,0" />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="DATA" />
+          <TextBlock Style="{StaticResource Hint}" Text="{Binding PortableStatus}" />
+          <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="12" Foreground="{StaticResource CrustBrush}"
+                     Margin="0,4,0,10" TextWrapping="Wrap" Text="{Binding DataFolder}" />
+          <WrapPanel>
+            <Button Content="OPEN DATA FOLDER" Command="{Binding OpenDataFolderCommand}" Margin="0,0,6,6" />
+            <Button Content="OPEN LOG FOLDER" Command="{Binding OpenLogFolderCommand}" Margin="0,0,6,6" />
+            <Button Content="{Binding PortableButtonText}" Command="{Binding TogglePortableCommand}" Margin="0,0,6,6" />
+          </WrapPanel>
+          <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
+                     Text="Profiles are saved with the SAVE button (Ctrl+S); these app settings save by themselves. Portable mode keeps everything next to the exe (handy on a USB stick); it is switched by a file named portable.flag beside the exe." />
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

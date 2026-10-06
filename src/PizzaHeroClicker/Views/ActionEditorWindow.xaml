@@ -1,0 +1,439 @@
+<Window x:Class="PizzaHeroClicker.Views.ActionEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:models="clr-namespace:PizzaHeroClicker.Models"
+        xmlns:controls="clr-namespace:PizzaHeroClicker.Controls"
+        Title="{Binding Title}" Style="{StaticResource AppWindow}" Width="640" SizeToContent="Height"
+        ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+
+  <Window.Resources>
+    <Style x:Key="Row" TargetType="StackPanel">
+      <Setter Property="Orientation" Value="Horizontal" />
+      <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+    <Style x:Key="Lbl" TargetType="TextBlock" BasedOn="{StaticResource InlineLabel}">
+      <Setter Property="Width" Value="130" />
+    </Style>
+    <Style x:Key="Axis" TargetType="TextBlock" BasedOn="{StaticResource InlineLabel}">
+      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="Margin" Value="0,0,6,0" />
+    </Style>
+    <Style x:Key="Unit" TargetType="TextBlock" BasedOn="{StaticResource InlineLabel}">
+      <Setter Property="Foreground" Value="{StaticResource DimBrush}" />
+      <Setter Property="Margin" Value="8,0,0,0" />
+    </Style>
+    <Style x:Key="PickButton" TargetType="Button" BasedOn="{StaticResource ChunkyButton}">
+      <Setter Property="Margin" Value="12,0,0,0" />
+      <Setter Property="Command" Value="{Binding DataContext.PickPositionCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+      <Setter Property="ToolTip" Value="Then click the spot on screen (any monitor). Esc cancels." />
+    </Style>
+
+    <!-- ===== Click ===== -->
+    <DataTemplate DataType="{x:Type models:ClickAction}">
+      <StackPanel>
+        <CheckBox Content="Click wherever the cursor already is" IsChecked="{Binding UseCursor}" Margin="0,0,0,10" />
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Position" />
+          <TextBlock Style="{StaticResource Axis}" Text="X" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding X, UpdateSourceTrigger=PropertyChanged}"
+                   IsEnabled="{Binding UseCursor, Converter={StaticResource InverseBool}}" />
+          <TextBlock Style="{StaticResource Axis}" Text="Y" Margin="10,0,6,0" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding Y, UpdateSourceTrigger=PropertyChanged}"
+                   IsEnabled="{Binding UseCursor, Converter={StaticResource InverseBool}}" />
+          <Button Style="{StaticResource PickButton}" Content="PICK ON SCREEN" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Button" />
+          <ComboBox ItemsSource="{x:Static models:EnumValues.ClickButtons}" SelectedItem="{Binding Button}" />
+          <ComboBox ItemsSource="{x:Static models:EnumValues.ClickKinds}" SelectedItem="{Binding Kind}" Margin="10,0,0,0" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Hold down for" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding HoldMs, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="ms  (0 = normal click)" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Position jitter" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding JitterPx, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="± px  (blank = profile setting)" />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- ===== Key press ===== -->
+    <DataTemplate DataType="{x:Type models:KeyPressAction}">
+      <StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Add a key" />
+          <controls:HotkeyBox Placeholder="Click here…" Combo="{Binding DataContext.PendingKey, RelativeSource={RelativeSource AncestorType=Window}}" />
+          <TextBlock Style="{StaticResource Unit}" Text="click, then press a key or combo" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Pressed in order" VerticalAlignment="Top" Margin="0,6,8,0" />
+          <ItemsControl ItemsSource="{Binding Keys}" Width="410" MinHeight="32">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Background="{StaticResource PanelAltBrush}" BorderBrush="{StaticResource CheeseDarkBrush}" BorderThickness="2"
+                        CornerRadius="8" Padding="8,2,2,2" Margin="0,0,6,6">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding Display}" FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center" />
+                    <Button Content="✕" Padding="6,0" Margin="6,0,0,0" FontSize="11" ToolTip="Remove"
+                            Command="{Binding DataContext.RemoveKeyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Hold each for" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding HoldMs, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="ms" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Gap between keys" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding GapMs, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="ms" />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- ===== Wait ===== -->
+    <DataTemplate DataType="{x:Type models:WaitAction}">
+      <StackPanel Style="{StaticResource Row}">
+        <TextBlock Style="{StaticResource Lbl}" Text="Wait for" />
+        <TextBox Style="{StaticResource NumBox}" Text="{Binding Ms, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBlock Style="{StaticResource Unit}" Text="ms" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- ===== Scroll ===== -->
+    <DataTemplate DataType="{x:Type models:ScrollAction}">
+      <StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Direction" />
+          <ComboBox ItemsSource="{x:Static models:EnumValues.ScrollDirections}" SelectedItem="{Binding Direction}" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Amount" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="wheel notches" />
+        </StackPanel>
+        <CheckBox Content="Scroll wherever the cursor already is" IsChecked="{Binding UseCursor}" Margin="0,2,0,10" />
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Position" />
+          <TextBlock Style="{StaticResource Axis}" Text="X" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding X, UpdateSourceTrigger=PropertyChanged}"
+                   IsEnabled="{Binding UseCursor, Converter={StaticResource InverseBool}}" />
+          <TextBlock Style="{StaticResource Axis}" Text="Y" Margin="10,0,6,0" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding Y, UpdateSourceTrigger=PropertyChanged}"
+                   IsEnabled="{Binding UseCursor, Converter={StaticResource InverseBool}}" />
+          <Button Style="{StaticResource PickButton}" Content="PICK ON SCREEN" />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- ===== Drag ===== -->
+    <DataTemplate DataType="{x:Type models:DragAction}">
+      <StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="From" />
+          <TextBlock Style="{StaticResource Axis}" Text="X" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding X1, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Axis}" Text="Y" Margin="10,0,6,0" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding Y1, UpdateSourceTrigger=PropertyChanged}" />
+          <Button Style="{StaticResource PickButton}" Content="PICK START" CommandParameter="start" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="To" />
+          <TextBlock Style="{StaticResource Axis}" Text="X" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding X2, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Axis}" Text="Y" Margin="10,0,6,0" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding Y2, UpdateSourceTrigger=PropertyChanged}" />
+          <Button Style="{StaticResource PickButton}" Content="PICK END" CommandParameter="end" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Button" />
+          <ComboBox ItemsSource="{x:Static models:EnumValues.ClickButtons}" SelectedItem="{Binding Button}" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Drag takes" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding DurationMs, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="ms" />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- ===== Move ===== -->
+    <DataTemplate DataType="{x:Type models:MoveAction}">
+      <StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Move to" />
+          <TextBlock Style="{StaticResource Axis}" Text="X" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding X, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Axis}" Text="Y" Margin="10,0,6,0" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding Y, UpdateSourceTrigger=PropertyChanged}" />
+          <Button Style="{StaticResource PickButton}" Content="PICK ON SCREEN" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Glide takes" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding DurationMs, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="ms  (0 = jump)" />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- ===== Pixel triggers: shared condition block ===== -->
+    <DataTemplate x:Key="PixelCondition">
+      <StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Watch pixel" />
+          <TextBlock Style="{StaticResource Axis}" Text="X" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding X, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Axis}" Text="Y" Margin="10,0,6,0" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding Y, UpdateSourceTrigger=PropertyChanged}" />
+          <Button Style="{StaticResource PickButton}" Content="EYEDROPPER" CommandParameter="pixel"
+                  ToolTip="Then click a pixel on screen to take its position and colour. Esc cancels." />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Until it is colour" />
+          <Border Width="30" Height="30" CornerRadius="8" BorderBrush="{StaticResource LineBrush}" BorderThickness="2"
+                  Margin="0,0,8,0" Background="{Binding Color, Converter={StaticResource HexToBrush}}" />
+          <TextBox Width="96" FontFamily="{StaticResource MonoFont}" Text="{Binding Color, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Axis}" Text="tolerance ±" Margin="14,0,6,0" />
+          <TextBox Style="{StaticResource NumBox}" Width="56" Text="{Binding Tolerance, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="per channel" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Give up after" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding TimeoutMs, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="ms  (0 = never), then" />
+          <ComboBox ItemsSource="{x:Static models:EnumValues.PixelTimeoutBehaviors}" SelectedItem="{Binding OnTimeout}"
+                    Margin="8,0,0,0" MinWidth="86"
+                    ToolTip="Skip: carry on with the next action. Stop: end the whole run." />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="After a click" />
+          <TextBlock Style="{StaticResource Axis}" Text="leave that spot alone for" />
+          <TextBox Style="{StaticResource NumBox}" Width="62" Text="{Binding RetargetDelayMs, UpdateSourceTrigger=PropertyChanged}"
+                   ToolTip="Stops a second click landing on a target that has already been hit and is still fading out. Wasted clicks often count as misses and break a combo. A target that was missed and keeps moving is clicked again once it has moved on. 0 = click again straight away." />
+          <TextBlock Style="{StaticResource Unit}" Text="ms" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Check every" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding PollMs, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="ms" />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type models:PixelWaitAction}">
+      <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource PixelCondition}" />
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type models:PixelClickAction}">
+      <StackPanel>
+        <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource PixelCondition}" />
+        <Border Height="2" Background="{StaticResource LineBrush}" Margin="0,4,0,12" />
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Then click with" />
+          <ComboBox ItemsSource="{x:Static models:EnumValues.ClickButtons}" SelectedItem="{Binding Button}" />
+          <ComboBox ItemsSource="{x:Static models:EnumValues.ClickKinds}" SelectedItem="{Binding Kind}" Margin="10,0,0,0" />
+          <TextBlock Style="{StaticResource Axis}" Text="hold" Margin="14,0,6,0" />
+          <TextBox Style="{StaticResource NumBox}" Width="56" Text="{Binding HoldMs, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="ms" />
+        </StackPanel>
+        <CheckBox Content="Click the watched pixel itself" IsChecked="{Binding ClickAtPixel}" Margin="0,2,0,10" />
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Click position" />
+          <TextBlock Style="{StaticResource Axis}" Text="X" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding ClickX, UpdateSourceTrigger=PropertyChanged}"
+                   IsEnabled="{Binding ClickAtPixel, Converter={StaticResource InverseBool}}" />
+          <TextBlock Style="{StaticResource Axis}" Text="Y" Margin="10,0,6,0" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding ClickY, UpdateSourceTrigger=PropertyChanged}"
+                   IsEnabled="{Binding ClickAtPixel, Converter={StaticResource InverseBool}}" />
+          <Button Style="{StaticResource PickButton}" Content="PICK ON SCREEN" CommandParameter="click" />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- ===== Area watch ===== -->
+    <DataTemplate DataType="{x:Type models:AreaWatchAction}">
+      <StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Watch this area" />
+          <TextBlock Style="{StaticResource Axis}" Text="X" />
+          <TextBox Style="{StaticResource NumBox}" Width="62" Text="{Binding X, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Axis}" Text="Y" Margin="8,0,6,0" />
+          <TextBox Style="{StaticResource NumBox}" Width="62" Text="{Binding Y, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Axis}" Text="W" Margin="8,0,6,0" />
+          <TextBox Style="{StaticResource NumBox}" Width="62" Text="{Binding Width, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Axis}" Text="H" Margin="8,0,6,0" />
+          <TextBox Style="{StaticResource NumBox}" Width="62" Text="{Binding Height, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}" Margin="138,0,0,12">
+          <Button Style="{StaticResource PrimaryButton}" Content="SELECT AREA ON SCREEN" Margin="0,0,8,0"
+                  Command="{Binding DataContext.PickRegionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                  ToolTip="Then drag a box around the part of the screen to watch. Esc cancels." />
+          <Button Content="TEST ON THE SCREEN NOW" Margin="0"
+                  Command="{Binding DataContext.TestAreaCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                  ToolTip="Watches the area for a moment with these settings and tells you what it sees, how closely each picture matched, and what it would click. Nothing is clicked. Have the game running with targets on screen; on a busy backdrop it watches for about four seconds." />
+        </StackPanel>
+
+        <DockPanel Margin="0,0,0,4" LastChildFill="True">
+          <TextBlock Style="{StaticResource Lbl}" Text="Only while" />
+          <Border Height="34" MaxWidth="150" CornerRadius="6" BorderBrush="{StaticResource CheeseDarkBrush}" BorderThickness="2"
+                  Background="{StaticResource InputBrush}" Padding="2" Margin="0,0,8,0"
+                  Visibility="{Binding HasAnchor, Converter={StaticResource BoolToVis}}">
+            <Image Source="{Binding AnchorImage, Converter={StaticResource Base64ToImage}}" Stretch="Uniform" />
+          </Border>
+          <TextBlock Style="{StaticResource Axis}" Text="{Binding AnchorText}" TextWrapping="Wrap" />
+        </DockPanel>
+        <StackPanel Style="{StaticResource Row}" Margin="138,0,0,12">
+          <Button Content="SNIP A START / STOP MARKER" Margin="0,0,8,0"
+                  Command="{Binding DataContext.SnipMarkerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                  ToolTip="Freezes the screen so you can drag a box around something that is always showing during the game and gone afterwards, such as a label or logo. The watch then waits for it to appear and only ever clicks while it is showing: the marker is checked again right before every click, so clicking stops the instant it disappears. Pick something that vanishes the moment the game ends, and that targets do not fly across." />
+          <Button Content="✕" Padding="8,2" Margin="0" ToolTip="Remove the marker"
+                  Command="{Binding DataContext.ClearMarkerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                  Visibility="{Binding HasAnchor, Converter={StaticResource BoolToVis}}" />
+        </StackPanel>
+
+        <TextBlock Text="Click things that look like this" Margin="0,0,0,6" />
+        <ItemsControl ItemsSource="{Binding Rules}" Focusable="False">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                <!-- A picture rule: recognised by shape -->
+                <StackPanel Orientation="Horizontal" Width="318"
+                            Visibility="{Binding IsImage, Converter={StaticResource MatchToVis}, ConverterParameter=True}">
+                  <Border Width="48" Height="48" CornerRadius="8" BorderBrush="{StaticResource CheeseDarkBrush}" BorderThickness="2"
+                          Background="{StaticResource InputBrush}" Margin="0,0,10,0" Padding="2">
+                    <Image Source="{Binding Image, Converter={StaticResource Base64ToImage}}" Stretch="Uniform"
+                           RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                  </Border>
+                  <TextBlock Style="{StaticResource Axis}" Text="picture; must match at least" />
+                  <TextBox Style="{StaticResource NumBox}" Width="52" Text="{Binding MatchPercent, UpdateSourceTrigger=PropertyChanged}"
+                           ToolTip="How alike something must be to count. About 55 suits Appearance matching, about 85 suits Exact. The TEST button shows the likeness each picture actually gets." />
+                  <TextBlock Style="{StaticResource Unit}" Text="%" Margin="6,0,0,0" />
+                </StackPanel>
+                <!-- A colour rule -->
+                <StackPanel Orientation="Horizontal" Width="318"
+                            Visibility="{Binding IsImage, Converter={StaticResource MatchToVis}, ConverterParameter=False}">
+                  <Border Width="30" Height="30" CornerRadius="8" BorderBrush="{StaticResource LineBrush}" BorderThickness="2"
+                          Margin="0,0,8,0" Background="{Binding Color, Converter={StaticResource HexToBrush}}" />
+                  <TextBox Width="92" FontFamily="{StaticResource MonoFont}" Text="{Binding Color, UpdateSourceTrigger=PropertyChanged}" />
+                  <TextBlock Style="{StaticResource Axis}" Text="colour; tolerance ±" Margin="12,0,6,0" />
+                  <TextBox Style="{StaticResource NumBox}" Width="52" Text="{Binding Tolerance, UpdateSourceTrigger=PropertyChanged}" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource Axis}" Text="click with" Margin="12,0,6,0" />
+                <ComboBox ItemsSource="{x:Static models:EnumValues.ClickButtons}" SelectedItem="{Binding Button}" MinWidth="90" />
+                <Button Content="✕" Padding="8,2" Margin="10,0,0,0" ToolTip="Remove"
+                        Command="{Binding DataContext.RemoveRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        CommandParameter="{Binding}" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <StackPanel Orientation="Horizontal" Margin="0,2,0,6">
+          <Button Style="{StaticResource PrimaryButton}" Content="+ ADD A PICTURE OF A TARGET" Margin="0,0,8,0"
+                  Command="{Binding DataContext.AddPictureCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                  ToolTip="Freezes the screen so you can drag a box around one target. On a busy backdrop (a game scene) select the area first and do this while targets are flying: it watches for about three seconds, then freezes, and removes the scene behind the target for you." />
+          <Button Style="{StaticResource PickButton}" Margin="0" CommandParameter="rule" Content="+ ADD A COLOUR"
+                  ToolTip="Then click on the colour. Use it for a marker the game draws on one kind of target, such as a red circle around satellites: anything carrying that colour gets this rule's button, clicked at its centre." />
+        </StackPanel>
+        <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,12"
+                   Text="Have the game showing with a target visible, then add one picture per kind of target. Press TEST to see how closely each picture matches what is on screen. Missed: lower its %. Wrong things clicked: raise it." />
+
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Recognise pictures" />
+          <TextBlock Style="{StaticResource Axis}" Text="by" />
+          <ComboBox ItemsSource="{x:Static models:EnumValues.PictureMatches}" SelectedItem="{Binding PictureMatch}" MinWidth="120"
+                    ToolTip="Appearance: by each object's mix of colours. Works when targets spin or vary in size. On a plain backdrop it finds anything that stands out; on a busy one (a picture, a planet) it finds whatever is moving. Exact: by precise pixel pattern. Tells apart same-coloured shapes, but targets must not rotate or change size; use about 85%." />
+          <TextBlock Style="{StaticResource Unit}" Text="(hover for what these mean)" />
+        </StackPanel>
+
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Click first" />
+          <TextBlock Style="{StaticResource Axis}" Text="whatever is nearest the" />
+          <ComboBox ItemsSource="{x:Static models:EnumValues.ScanPriorities}" SelectedItem="{Binding Priority}" MinWidth="96"
+                    ToolTip="Top, Bottom, Left, Right: the target closest to that edge. Center: the target closest to the middle of the area." />
+          <TextBlock Style="{StaticResource Unit}" Text="of the area" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Ignore specks under" />
+          <TextBox Style="{StaticResource NumBox}" Width="62" Text="{Binding MinPixels, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="matching pixels" />
+          <TextBlock Style="{StaticResource Axis}" Text="hold click" Margin="16,0,6,0" />
+          <TextBox Style="{StaticResource NumBox}" Width="56" Text="{Binding HoldMs, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="ms" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Keep watching for" />
+          <TextBox Style="{StaticResource NumBox}" Width="80" Text="{Binding WatchForMs, UpdateSourceTrigger=PropertyChanged}"
+                   ToolTip="How long to stay on this action, clicking every target that appears, before moving on to the next action. Example: 31000 for a 31-second game. 0 means click a single target and move on, which suits a list that loops." />
+          <TextBlock Style="{StaticResource Unit}" Text="ms  (0 = one target; with a marker, 0 = until it goes)" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="After a click" />
+          <TextBlock Style="{StaticResource Axis}" Text="leave that spot alone for" />
+          <TextBox Style="{StaticResource NumBox}" Width="62" Text="{Binding RetargetDelayMs, UpdateSourceTrigger=PropertyChanged}"
+                   ToolTip="Stops a second click landing on a target that has already been hit and is still fading out. Wasted clicks often count as misses and break a combo. A target that was missed and keeps moving is clicked again once it has moved on. 0 = click again straight away." />
+          <TextBlock Style="{StaticResource Unit}" Text="ms" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Check every" />
+          <TextBox Style="{StaticResource NumBox}" Width="62" Text="{Binding PollMs, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="ms while the area is empty" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}" Margin="0">
+          <TextBlock Style="{StaticResource Lbl}" Text="Give up after" />
+          <TextBox Style="{StaticResource NumBox}" Width="70" Text="{Binding TimeoutMs, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="ms  (0 = never), then" Margin="8,0,8,0" />
+          <ComboBox ItemsSource="{x:Static models:EnumValues.PixelTimeoutBehaviors}" SelectedItem="{Binding OnTimeout}" MinWidth="86"
+                    ToolTip="Skip: carry on with the next action. Stop: end the whole run." />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+  </Window.Resources>
+
+  <!-- Scrolls if the dialog would be taller than the screen (the area watch has many options). -->
+  <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+  <StackPanel Margin="18">
+    <Border Style="{StaticResource Card}">
+      <ContentControl Content="{Binding Action}" Focusable="False" />
+    </Border>
+
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Note (optional)" />
+          <TextBox Width="400" Text="{Binding Action.Label, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}" Margin="0">
+          <TextBlock Style="{StaticResource Lbl}" Text="Delay afterwards" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding Action.IntervalMs, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="to" Margin="8,0,8,0" />
+          <TextBox Style="{StaticResource NumBox}" Text="{Binding Action.IntervalMaxMs, TargetNullValue='', UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="ms" />
+        </StackPanel>
+        <TextBlock Style="{StaticResource Hint}" Margin="138,6,0,0"
+                   Text="Leave blank to use the global interval. Fill in both boxes for a random delay in that range." />
+      </StackPanel>
+    </Border>
+
+    <TextBlock Text="{Binding Error}" Foreground="{StaticResource TomatoBrush}" FontWeight="SemiBold" TextWrapping="Wrap"
+               Margin="2,0,0,10" Visibility="{Binding Error, Converter={StaticResource TextToVis}}" />
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+      <Button Content="SAVE" Style="{StaticResource PrimaryButton}" MinWidth="96" IsDefault="True" Click="OnSave" />
+      <Button Content="CANCEL" MinWidth="96" IsCancel="True" Margin="0" />
+    </StackPanel>
+  </StackPanel>
+  </ScrollViewer>
+</Window>

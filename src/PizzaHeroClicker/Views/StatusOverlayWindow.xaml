@@ -1,0 +1,15 @@
+<Window x:Class="PizzaHeroClicker.Views.StatusOverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Pizza Hero Clicker status" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False" Focusable="False" ResizeMode="NoResize"
+        SizeToContent="WidthAndHeight" WindowStartupLocation="Manual" Left="-10000" Top="-10000">
+  <Border x:Name="Pill" CornerRadius="14" BorderThickness="2" Padding="10,5" Background="#E617110E"
+          BorderBrush="{StaticResource LineBrush}" Cursor="SizeAll" MouseLeftButtonDown="OnMouseDown">
+    <StackPanel Orientation="Horizontal">
+      <Ellipse x:Name="Dot" Width="12" Height="12" Margin="0,0,8,0" VerticalAlignment="Center" Fill="{StaticResource DimBrush}" />
+      <TextBlock x:Name="Label" Text="OFF" FontFamily="{StaticResource HeadFont}" FontWeight="Bold" FontSize="15"
+                 Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" />
+    </StackPanel>
+  </Border>
+</Window>

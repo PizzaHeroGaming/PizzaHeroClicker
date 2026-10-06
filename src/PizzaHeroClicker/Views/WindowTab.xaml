@@ -1,0 +1,52 @@
+<UserControl x:Class="PizzaHeroClicker.Views.WindowTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:PizzaHeroClicker.Controls">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+    <StackPanel Margin="0,0,4,0">
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="TARGET WINDOW" />
+          <Border Background="{StaticResource InputBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="2"
+                  CornerRadius="8" Padding="10,7" Margin="0,0,0,10">
+            <TextBlock Text="{Binding Profile.Window.Description}" FontFamily="{StaticResource MonoFont}" Foreground="{StaticResource CrustBrush}" TextTrimming="CharacterEllipsis" />
+          </Border>
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <Button Content="PICK WINDOW…" Style="{StaticResource PrimaryButton}" Command="{Binding PickTargetWindowCommand}" />
+            <Button Content="CLEAR" Command="{Binding ClearTargetWindowCommand}" />
+          </StackPanel>
+
+          <CheckBox Content="Use this window as the target" IsChecked="{Binding Profile.Window.Enabled}" Margin="0,0,0,8" />
+          <StackPanel IsEnabled="{Binding Profile.Window.Enabled}">
+            <CheckBox Content="Only run while it is focused" IsChecked="{Binding Profile.Window.OnlyWhenFocused}" />
+            <TextBlock Style="{StaticResource Hint}" Margin="28,4,0,10"
+                       Text="Pauses automatically when you switch to another window and resumes when you come back. The start countdown gives you time to switch to it." />
+            <CheckBox Content="Positions are relative to the window" IsChecked="{Binding Profile.Window.RelativeCoordinates}" />
+            <TextBlock Style="{StaticResource Hint}" Margin="28,4,0,0"
+                       Text="Saved positions are measured from the window's top-left corner instead of the screen's, so they still work after the window moves. Existing positions are converted when you tick or untick this while the window is open." />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="OVERLAYS" />
+          <CheckBox Content="Show a small ON / OFF indicator on top of everything" IsChecked="{Binding Profile.Overlay.ShowStatus}" Margin="0,0,0,8" />
+          <CheckBox Content="Lock the indicator (clicks pass through it)" IsChecked="{Binding Profile.Overlay.StatusClickThrough}"
+                    IsEnabled="{Binding Profile.Overlay.ShowStatus}" Margin="28,0,0,0" />
+          <TextBlock Style="{StaticResource Hint}" Margin="56,4,0,12" Text="Untick to drag the indicator somewhere else, then lock it again." />
+
+          <StackPanel Orientation="Horizontal">
+            <CheckBox Content="Show numbered markers at every saved position" IsChecked="{Binding Profile.Overlay.ShowPositions}" />
+            <TextBlock Style="{StaticResource InlineLabel}" Text="Toggle with" Margin="18,0,8,0" Foreground="{StaticResource DimBrush}" />
+            <controls:HotkeyBox Combo="{Binding Profile.Hotkeys.Overlay}" Width="150" />
+          </StackPanel>
+          <TextBlock Style="{StaticResource Hint}" Margin="28,6,0,0"
+                     Text="Markers are drawn on every monitor and never block the mouse. Overlays can't appear over games running in exclusive fullscreen; use borderless or windowed mode for those." />
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

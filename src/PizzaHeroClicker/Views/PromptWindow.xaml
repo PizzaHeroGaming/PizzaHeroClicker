@@ -1,0 +1,11 @@
+<Window x:Class="PizzaHeroClicker.Views.PromptWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Style="{StaticResource AppWindow}" SizeToContent="WidthAndHeight" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" MinWidth="360" MaxWidth="560">
+  <StackPanel Margin="18">
+    <TextBlock x:Name="MessageText" TextWrapping="Wrap" Margin="0,0,0,12" />
+    <TextBox x:Name="InputBox" Margin="0,0,0,14" Visibility="Collapsed" MinWidth="300" />
+    <StackPanel x:Name="ButtonRow" Orientation="Horizontal" HorizontalAlignment="Right" />
+  </StackPanel>
+</Window>

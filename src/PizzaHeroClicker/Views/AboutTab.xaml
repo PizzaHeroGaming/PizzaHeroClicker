@@ -1,0 +1,104 @@
+<UserControl x:Class="PizzaHeroClicker.Views.AboutTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <UserControl.Resources>
+    <Style x:Key="Line" TargetType="TextBlock">
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+      <Setter Property="LineHeight" Value="19" />
+    </Style>
+    <Style TargetType="Hyperlink">
+      <Setter Property="Foreground" Value="{StaticResource CheeseBrush}" />
+      <Setter Property="TextDecorations" Value="None" />
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="TextDecorations" Value="Underline" />
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+  </UserControl.Resources>
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+    <StackPanel Margin="0,0,4,0">
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock FontFamily="{StaticResource HeadFont}" FontWeight="Bold" FontSize="26"
+                     Foreground="{StaticResource TomatoBrush}" Text="PIZZA HERO CLICKER" />
+          <TextBlock x:Name="VersionText" FontFamily="{StaticResource MonoFont}" Foreground="{StaticResource CheeseBrush}"
+                     Margin="0,2,0,10" />
+          <TextBlock Style="{StaticResource Line}" Margin="0"
+                     Text="An auto clicker for Windows: repeat clicks, run sequences of actions, record and play back, and watch part of the screen to click things as they appear." />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="UPDATES" />
+          <TextBlock Style="{StaticResource Line}" Text="{Binding UpdateStatus}" />
+          <Border Background="{StaticResource InputBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="2" CornerRadius="8"
+                  Padding="10,8" Margin="0,2,0,8" MaxHeight="160"
+                  Visibility="{Binding UpdateNotes, Converter={StaticResource TextToVis}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+              <TextBlock Text="{Binding UpdateNotes}" TextWrapping="Wrap" Foreground="{StaticResource DimBrush}" />
+            </ScrollViewer>
+          </Border>
+          <StackPanel Orientation="Horizontal" Margin="0,2,0,8">
+            <Button Style="{StaticResource PrimaryButton}" Content="{Binding InstallUpdateText}" Margin="0,0,8,0"
+                    Command="{Binding InstallUpdateCommand}"
+                    Visibility="{Binding UpdateAvailable, Converter={StaticResource BoolToVis}}"
+                    ToolTip="Downloads the new installer, checks it, closes this copy, installs over it and starts it again. Your profiles and settings are kept." />
+            <Button Content="CHECK FOR UPDATES" Margin="0,0,8,0" Command="{Binding CheckForUpdatesCommand}" />
+            <Button Content="ALL RELEASES" Margin="0" Command="{Binding OpenReleasesPageCommand}"
+                    ToolTip="Opens the releases page on GitHub in your browser." />
+          </StackPanel>
+          <CheckBox Content="Check when the app starts" IsChecked="{Binding Settings.CheckForUpdates}" />
+          <TextBlock Style="{StaticResource Hint}" Margin="28,4,0,0"
+                     Text="The check asks GitHub for the newest release and sends nothing about you or your profiles. Nothing is downloaded or installed until you press the update button." />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="MADE BY" />
+          <TextBlock Style="{StaticResource Line}" Text="YourPizzaHero, at Pizza Hero Gaming: a solo indie studio, est. 2026." />
+          <TextBlock Style="{StaticResource Line}">
+            <Run Text="Website:  " Foreground="{StaticResource DimBrush}" />
+            <Hyperlink NavigateUri="https://pizzaherogaming.github.io/PizzaHeroGaming/" RequestNavigate="OpenLink">pizzaherogaming.github.io/PizzaHeroGaming</Hyperlink>
+          </TextBlock>
+          <TextBlock Style="{StaticResource Line}" Margin="0">
+            <Run Text="GitHub:   " Foreground="{StaticResource DimBrush}" />
+            <Hyperlink NavigateUri="https://github.com/PizzaHeroGaming/PizzaHeroClicker" RequestNavigate="OpenLink">github.com/PizzaHeroGaming/PizzaHeroClicker</Hyperlink>
+          </TextBlock>
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="LICENSE AND CREDITS" />
+          <TextBlock Style="{StaticResource Line}" Text="© 2026 Pizza Hero Gaming. All rights reserved." />
+          <TextBlock Style="{StaticResource Line}" Margin="0">
+            <Run Text="Built with .NET 8 and WPF. Uses " />
+            <Hyperlink NavigateUri="https://github.com/CommunityToolkit/dotnet" RequestNavigate="OpenLink">CommunityToolkit.Mvvm</Hyperlink>
+            <Run Text=" (MIT licence)." />
+          </TextBlock>
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="THIS COPY" />
+          <TextBlock Style="{StaticResource Line}">
+            <Run Text="Profiles, settings and logs are kept in:" Foreground="{StaticResource DimBrush}" />
+          </TextBlock>
+          <TextBlock x:Name="DataFolderText" Style="{StaticResource Line}" FontFamily="{StaticResource MonoFont}" />
+          <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+            <Button Content="OPEN DATA FOLDER" Margin="0,0,8,0" Command="{Binding OpenDataFolderCommand}" />
+            <Button Content="OPEN LOG FOLDER" Margin="0" Command="{Binding OpenLogFolderCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
