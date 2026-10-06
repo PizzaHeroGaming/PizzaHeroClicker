@@ -240,9 +240,23 @@ public sealed class ProfileService
     }
 
     /// <summary>Imports a profile file into a game under a free name. Throws if the file is invalid.</summary>
-    public ProfileRef Import(string sourcePath, string game = "")
+    /// <summary>Largest file accepted as a profile. Real ones, pictures included, are well under a megabyte.</summary>
+    public const long MaxImportBytes = 20L * 1024 * 1024;
+
+    /// <summary>Reads a profile file from anywhere without saving it, so it can be looked over first.</summary>
+    public Profile ReadForImport(string sourcePath, string game = "")
     {
-        var profile = Read(sourcePath, new ProfileRef(game, "import"));
+        if (new FileInfo(sourcePath).Length > MaxImportBytes)
+            throw new InvalidDataException("The file is far too big to be a profile.");
+        return Read(sourcePath, new ProfileRef(game, "import"));
+    }
+
+    public ProfileRef Import(string sourcePath, string game = "") => Import(ReadForImport(sourcePath, game), sourcePath, game);
+
+    /// <summary>Saves a profile read with <see cref="ReadForImport"/> under a free name taken from the file's name.</summary>
+    public ProfileRef Import(Profile profile, string sourcePath, string game = "")
+    {
+        profile.Game = game;
         string name = UniqueName(game, Sanitize(Path.GetFileNameWithoutExtension(sourcePath)));
         profile.Name = name;
         if (QuickSwitchHotkeys().Values.Contains(profile.QuickSwitchHotkey)) profile.QuickSwitchHotkey = default;

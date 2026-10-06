@@ -456,9 +456,19 @@ public partial class MainViewModel
         if (path is null || !ConfirmLeaveProfile()) return;
         try
         {
-            var imported = _s.Profiles.Import(path, Profile.Game);
+            // A profile is a script of clicks and key presses, and this one may come from a
+            // stranger: show what it would do before anything is saved, let alone run.
+            var incoming = _s.Profiles.ReadForImport(path, Profile.Game);
+            var review = ProfileInspector.Inspect(incoming);
+            int choice = _s.Dialogs.ReviewProfile("Import profile", Path.GetFileNameWithoutExtension(path), review, importing: true);
+            if (choice < 0) return;
+
+            int keysOff = choice == 1 ? ProfileInspector.TurnKeyPressesOff(incoming) : 0;
+            ProfileInspector.KeepControlsWithTheUser(incoming, Profile.Hotkeys);
+            var imported = _s.Profiles.Import(incoming, path, Profile.Game);
             LoadProfile(imported);
-            Footer = $"Imported \"{imported.Display}\".";
+            Footer = $"Imported \"{imported.Display}\"" + (keysOff > 0 ? $" with {keysOff} key action{(keysOff == 1 ? "" : "s")} switched off (Actions tab)." : ".");
+            Log.Info($"Imported '{path}' as '{imported.Display}' (review: {review.Worst}, key actions switched off: {keysOff})");
         }
         catch (Exception ex)
         {
@@ -466,6 +476,11 @@ public partial class MainViewModel
             _s.Dialogs.Inform("Import profile", "That file could not be imported. It doesn't look like a valid profile.\n\n" + ex.Message);
         }
     }
+
+    /// <summary>The same look-over an import gets, for the profile that is open.</summary>
+    [RelayCommand]
+    private void ReviewProfile() =>
+        _s.Dialogs.ReviewProfile("Safety check", Profile.Name, ProfileInspector.Inspect(Profile), importing: false);
 
     /// <summary>Exports the profile as it is right now, including unsaved edits.</summary>
     [RelayCommand]

@@ -303,6 +303,29 @@ notes are on the [releases page](https://github.com/PizzaHeroGaming/PizzaHeroCli
 The installer is not code-signed yet, so Windows may show "Windows protected your PC": choose
 **More info**, then **Run anyway**.
 
+## Sharing profiles safely
+
+**MANAGE → Export to file** writes a profile to a file you can send to someone; they bring it in
+with **MANAGE → Import from file**.
+
+A profile is a script of mouse clicks and key presses, so **only import profiles from people you
+trust**. One made to cause harm could, for example, open the Windows Run box and type a command.
+To make that hard to do unnoticed:
+
+- Every import first shows what the profile would do, most serious first: the keys it presses in
+  order, any text it types, whether it is locked to a game window, and anything a game profile
+  should not need (the Windows key, Alt+Tab, typing a line and pressing Enter), marked `RISK`.
+  Nothing is saved until you choose.
+- **IMPORT WITH KEY PRESSES OFF** brings it in with every key action unticked, so you can read them
+  on the Actions tab and tick the ones you are happy with.
+- An imported profile always gets your own hotkeys, loses any quick-switch hotkey, and keeps the
+  mouse-to-corner emergency stop on. It cannot change how you start or stop a run.
+- Nothing runs until you start it. Files over 20 MB are refused.
+- **MANAGE → Safety check** shows the same report for the profile that is open.
+
+The check catches the obvious tricks, not every possible one. A profile copied straight into the
+data folder by hand skips the import check, so use Import.
+
 ## Updates
 
 The app looks at this project's [GitHub releases](https://github.com/PizzaHeroGaming/PizzaHeroClicker/releases)

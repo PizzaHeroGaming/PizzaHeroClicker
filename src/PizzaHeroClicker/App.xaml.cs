@@ -576,6 +576,31 @@ public partial class App : Application
             SaveSnapshot(picker, Path.Combine(dir, "game-picker-new.png"));
             picker.Close();
 
+            // The import review, for a profile that tries to run a command and for a harmless one.
+            var hostile = new Profile();
+            hostile.Actions.Add(new ClickAction { X = 400, Y = 300 });
+            hostile.Actions.Add(new KeyPressAction { Keys = { KeyCombo.Parse("Win+R") } });
+            var typed = new KeyPressAction();
+            foreach (string key in new[] { "C", "M", "D", "Enter" }) typed.Keys.Add(KeyCombo.Parse(key));
+            hostile.Actions.Add(typed);
+            var harmless = new Profile();
+            harmless.Window.Enabled = true;
+            harmless.Window.Title = "Galaxy Idle Clicker";
+            harmless.Window.ProcessName = "GalaxyIdleClicker";
+            harmless.Actions.Add(new ClickAction { X = 400, Y = 300 });
+            harmless.Actions.Add(new WaitAction());
+            foreach (var (sample, file) in new[] { (hostile, "review-risky.png"), (harmless, "review-clean.png") })
+            {
+                var reviewWindow = new ProfileReviewWindow("Import profile", "Free gems farm", ProfileInspector.Inspect(sample), importing: true)
+                {
+                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                };
+                reviewWindow.Show();
+                await Settle();
+                SaveSnapshot(reviewWindow, Path.Combine(dir, file));
+                reviewWindow.Close();
+            }
+
             // Row numbers must stay 1, 2, 3... after rows are moved (they once did not).
             window.TabHost.SelectedIndex = 1;
             _viewModel.MoveAction(_viewModel.Profile.Actions.Count - 1, 0);

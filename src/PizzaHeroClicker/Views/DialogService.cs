@@ -266,6 +266,13 @@ public sealed class DialogService(ScreenService screen) : IDialogService
 
     public void Inform(string title, string message) => PromptWindow.Show(Owner, title, message, null, "OK");
 
+    public int ReviewProfile(string title, string profileName, ProfileReview review, bool importing)
+    {
+        var dialog = new ProfileReviewWindow(title, profileName, review, importing);
+        ShowModal(dialog);
+        return dialog.Result;
+    }
+
     public string? ChooseGame(string title, string message, IReadOnlyList<string> games, string current, string noGameLabel, string confirmText)
     {
         var dialog = new GamePickerWindow(title, message, games, current, noGameLabel, confirmText);

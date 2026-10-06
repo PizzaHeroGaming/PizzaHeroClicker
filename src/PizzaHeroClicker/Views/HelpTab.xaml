@@ -112,6 +112,18 @@
         </StackPanel>
       </Border>
 
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="SHARING PROFILES SAFELY" />
+          <TextBlock Style="{StaticResource Step}" Text="•  To share: MANAGE, Export to file. Send the file to someone; they use MANAGE, Import from file." />
+          <TextBlock Style="{StaticResource Step}" Text="•  A profile is a script of mouse clicks and key presses, so only import profiles from people you trust. One made to cause harm could, for example, open the Windows Run box and type a command." />
+          <TextBlock Style="{StaticResource Step}" Text="•  Every import first shows what the profile would do: the keys it presses in order, any text it types, whether it is locked to a game window, and anything a game profile should not need (marked RISK). Nothing is saved until you choose." />
+          <TextBlock Style="{StaticResource Step}" Text="•  IMPORT WITH KEY PRESSES OFF brings it in with every key action unticked. Read them on the Actions tab and tick the ones you are happy with." />
+          <TextBlock Style="{StaticResource Step}" Text="•  An imported profile always gets your own hotkeys and keeps the mouse-to-corner emergency stop on, so it cannot change how you start or stop a run. Nothing runs until you start it." />
+          <TextBlock Style="{StaticResource Step}" Margin="0" Text="•  MANAGE, Safety check shows the same report for the profile that is open. The check catches the obvious tricks, not every possible one: it is a second pair of eyes, not a guarantee." />
+        </StackPanel>
+      </Border>
+
     </StackPanel>
   </ScrollViewer>
 </UserControl>

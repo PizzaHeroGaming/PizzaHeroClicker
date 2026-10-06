@@ -11,7 +11,7 @@
     <AssemblyName>PizzaHeroClicker</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Version>1.1.2</Version>
+    <Version>1.2.0</Version>
     <Product>Pizza Hero Clicker</Product>
     <Company>Pizza Hero Gaming</Company>
     <Copyright>Pizza Hero Gaming</Copyright>

@@ -34,6 +34,13 @@ public interface IDialogService
     void Inform(string title, string message);
 
     /// <summary>
+    /// Shows what a profile from someone else would do. Returns 0 to import it as it is, 1 to
+    /// import it with its key presses switched off, -1 to cancel. With <paramref name="importing"/>
+    /// false it only informs (one Close button, returns -1).
+    /// </summary>
+    int ReviewProfile(string title, string profileName, ProfileReview review, bool importing);
+
+    /// <summary>
     /// Asks which game something belongs to, from a list of the existing games plus "no game" and
     /// an entry for typing a new one. Returns the game ("" = no game), or null if cancelled.
     /// </summary>

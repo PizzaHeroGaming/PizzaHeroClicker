@@ -125,6 +125,7 @@
               <MenuItem Header="Delete…" Command="{Binding DeleteProfileCommand}" />
               <MenuItem Header="Import from file…" Command="{Binding ImportProfileCommand}" />
               <MenuItem Header="Export to file…" Command="{Binding ExportProfileCommand}" />
+              <MenuItem Header="Safety check…" Command="{Binding ReviewProfileCommand}" />
             </ContextMenu>
           </Button.ContextMenu>
         </Button>
