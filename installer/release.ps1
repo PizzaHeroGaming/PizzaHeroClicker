@@ -25,8 +25,9 @@ gh auth status | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'The GitHub CLI is not signed in. Run: gh auth login' }
 
 # The app compares version numbers, so a release must never be replaced under the same number.
-gh release view $tag --repo $repo | Out-Null
-if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists. Bump <Version> in the .csproj first." }
+$existing = gh release list --repo $repo --limit 200 --json tagName --jq '.[].tagName'
+if ($LASTEXITCODE -ne 0) { throw 'Could not list the existing releases.' }
+if ($existing -contains $tag) { throw "Release $tag already exists. Bump <Version> in the .csproj first." }
 
 # What gets tagged is what is on GitHub, so everything has to be committed and pushed.
 Push-Location $root
