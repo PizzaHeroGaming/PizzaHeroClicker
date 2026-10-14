@@ -33,6 +33,57 @@ public static class ScreenAnchor
         }
         return (double)same / n;
     }
+
+    /// <summary>
+    /// Looks for the marker anywhere in <paramref name="region"/> (a capture larger than the marker,
+    /// centred on where it was snipped). Returns where its top-left sits in the region and how
+    /// alike it is there, or null if nowhere reaches <paramref name="minShare"/>.
+    /// </summary>
+    public static (int X, int Y, double Share)? FindNear(int[] region, int regionWidth, int regionHeight, int[] reference, int width, int height, double minShare)
+    {
+        if (regionWidth < width || regionHeight < height || reference.Length != width * height || region.Length < regionWidth * regionHeight) return null;
+        int n = reference.Length;
+
+        int Score(int ox, int oy, int give)
+        {
+            int misses = 0;
+            for (int y = 0; y < height; y++)
+            {
+                int row = (oy + y) * regionWidth + ox, refRow = y * width;
+                for (int x = 0; x < width; x++)
+                {
+                    int a = region[row + x], b = reference[refRow + x];
+                    if (Math.Abs(((a >> 16) & 0xFF) - ((b >> 16) & 0xFF)) > Tolerance
+                        || Math.Abs(((a >> 8) & 0xFF) - ((b >> 8) & 0xFF)) > Tolerance
+                        || Math.Abs((a & 0xFF) - (b & 0xFF)) > Tolerance)
+                    {
+                        if (++misses > give) return misses; // cannot win from here
+                    }
+                }
+            }
+            return misses;
+        }
+
+        // Every other position first (a shifted label still matches well one pixel off), then the
+        // neighbours of the best one. Hopeless positions are given up on early, so this is quick.
+        int worthALook = n / 4; // 75% alike on the coarse pass: close enough to look at its neighbours
+        int bestMisses = int.MaxValue, bx = -1, by = -1;
+        for (int oy = 0; oy <= regionHeight - height; oy += 2)
+        for (int ox = 0; ox <= regionWidth - width; ox += 2)
+        {
+            int m = Score(ox, oy, Math.Min(bestMisses, worthALook));
+            if (m <= worthALook && m < bestMisses) (bestMisses, bx, by) = (m, ox, oy);
+        }
+        if (bx < 0) return null;
+        for (int oy = Math.Max(0, by - 1); oy <= Math.Min(regionHeight - height, by + 1); oy++)
+        for (int ox = Math.Max(0, bx - 1); ox <= Math.Min(regionWidth - width, bx + 1); ox++)
+        {
+            int m = Score(ox, oy, bestMisses);
+            if (m < bestMisses) (bestMisses, bx, by) = (m, ox, oy);
+        }
+        double share = 1 - (double)bestMisses / n;
+        return share >= minShare ? (bx, by, share) : null;
+    }
 }
 
 /// <summary>What one look at the area found. Produced for the editor's Test button.</summary>

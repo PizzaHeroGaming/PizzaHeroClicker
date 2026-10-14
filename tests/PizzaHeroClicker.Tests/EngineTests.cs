@@ -441,6 +441,50 @@ public class ClickEngineTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void AMarkerAFewPixelsFromWhereItWasSnippedIsStillFound()
+    {
+        // The game window was nudged 13 px left and 1 px down after the marker was snipped at (500, 20).
+        const int ShiftX = -13, ShiftY = 1;
+        var label = new int[20 * 10];
+        for (int i = 0; i < label.Length; i++) label[i] = i % 3 == 0 ? 0xFFFFFF : 0x202020;
+        int Screen(int x, int y)
+        {
+            int lx = x - (500 + ShiftX), ly = y - (20 + ShiftY);
+            if (lx is >= 0 and < 20 && ly is >= 0 and < 10) return label[ly * 20 + lx];
+            if (x is >= 120 and < 130 && y is >= 115 and < 125) return 0xE04030; // a target in the area
+            return 0;
+        }
+        _screen.Capture = (x0, y0, w, h) =>
+        {
+            var frame = new int[w * h];
+            for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                frame[y * w + x] = Screen(x0 + x, y0 + y);
+            return frame;
+        };
+
+        var profile = Plain(10, 1);
+        profile.Repeat.Mode = RepeatMode.Loops;
+        profile.Actions.Add(new AreaWatchAction
+        {
+            X = 100, Y = 100, Width = 60, Height = 40, PollMs = 10, MinPixels = 10, RetargetDelayMs = 0, WatchForMs = 800,
+            AnchorImage = TemplateImage.Encode(label, 20, 10), AnchorX = 500, AnchorY = 20, AnchorWidth = 20, AnchorHeight = 10,
+            Rules = { new AreaRule { Color = "#E8432E", Tolerance = 30, Button = ClickButton.Left } },
+        });
+        Assert.Equal(StopReason.Completed, Run(profile).Reason);
+
+        var clicks = _input.Snapshot().Where(e => e.Event.StartsWith("click")).ToList();
+        Assert.True(clicks.Count > 10, $"only {clicks.Count} clicks: the moved marker was not found");
+        // The area moved with the marker, and the clicks still land on the target itself.
+        Assert.All(_input.Snapshot().Where(e => e.Event.StartsWith("move ")), e =>
+        {
+            var xy = e.Event[5..].Split(',').Select(int.Parse).ToArray();
+            Assert.InRange(xy[0], 120, 129);
+            Assert.InRange(xy[1], 115, 124);
+        });
+    }
+
+    [Fact]
     public void AMarkerStartsTheWatchWhenItAppearsAndEndsItWhenItGoes()
     {
         // The area always has a target. The marker (a 20 x 10 label at 500, 20) decides when clicking happens.
@@ -454,9 +498,12 @@ public class ClickEngineTests(ITestOutputHelper output)
         var somethingElse = new int[20 * 10];
 
         volatile_markerShowing = false;
-        _screen.Capture = (x, y, w, h) => (w, h) == (20, 10)
-            ? (x == 500 && y == 20 && volatile_markerShowing ? (int[])label.Clone() : (int[])somethingElse.Clone())
-            : (int[])frame.Clone();
+        _screen.Capture = (x, y, w, h) => (w, h) switch
+        {
+            (20, 10) => x == 500 && y == 20 && volatile_markerShowing ? (int[])label.Clone() : (int[])somethingElse.Clone(),
+            (W, H) => (int[])frame.Clone(),
+            _ => new int[w * h], // the search round the marker's spot: nothing there either
+        };
 
         var profile = Plain(10, 1);
         profile.Repeat.Mode = RepeatMode.Loops;

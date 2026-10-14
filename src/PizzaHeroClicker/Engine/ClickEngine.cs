@@ -78,6 +78,13 @@ public sealed class ClickEngine : IDisposable
     private int[] _areaPixels = [];
     private readonly Dictionary<AreaWatchAction, AreaDetector> _detectors = new(); // engine thread only; rebuilt each run
     private readonly Dictionary<AreaWatchAction, int[]?> _anchors = new();           // decoded start/stop markers
+    // How far each marker was found from where it was snipped: the game window has moved by that
+    // much, so the area it belongs to is moved with it. Found by searching around the snipped spot.
+    private readonly Dictionary<AreaWatchAction, (int X, int Y)> _anchorShift = new();
+    private readonly Dictionary<AreaWatchAction, long> _anchorNextSearch = new();
+    private int[] _anchorRegion = [];
+    private const int AnchorSearchPx = 40;       // how far from its snipped spot a marker is looked for
+    private const double AnchorSearchEveryMs = 400;
     private int[] _anchorPixels = [];
     private const double AnchorCheckMs = 100;   // how often the marker is looked at while there is nothing to click
     private const double AnchorGraceMs = 500;   // the marker must be gone this long before the watch ENDS
@@ -206,6 +213,8 @@ public sealed class ClickEngine : IDisposable
             _ownCheckPoint = (int.MinValue, int.MinValue);
             _detectors.Clear();
             _anchors.Clear();
+            _anchorShift.Clear();
+            _anchorNextSearch.Clear();
             _recentAreaClicks.Clear();
             _debugClicks.Clear();
             StartDebugRecording();
@@ -715,7 +724,8 @@ public sealed class ClickEngine : IDisposable
                 }
             }
 
-            var (left, top) = Resolve(a.X, a.Y); // re-resolved every pass: the target window may move
+            var (sx, sy) = _anchorShift.GetValueOrDefault(a);
+            var (left, top) = Resolve(a.X + sx, a.Y + sy); // re-resolved every pass: the target window may move
             long lookedAt = TimingEngine.Now;
             bool captured = _screen.TryCapture(left, top, a.Width, a.Height, ref _areaPixels);
             bool record = captured && _debugFolder is not null && _debugCount < MaxDebugSnapshots && TimingEngine.Now >= _debugNextAt;
@@ -739,7 +749,7 @@ public sealed class ClickEngine : IDisposable
                 // moment, so that something drifting across the marker does not end it early.
                 if (anchor is not null)
                 {
-                    if (!AnchorShowing(a, anchor))
+                    if (!AnchorShowing(a, anchor, search: false))
                     {
                         anchorNextCheck = 0; // re-check at the top of the loop, which also handles ending
                         _t = TimingEngine.Now;
@@ -753,13 +763,13 @@ public sealed class ClickEngine : IDisposable
                 _t = TimingEngine.Now; // the wait had no fixed length: restart the timeline from here
                 if (a.LeadMovingTargets) (x, y) = AimAhead(a, x, y, detector.TargetVelocity, lookedAt);
                 // DoClick takes profile-space coordinates and resolves them itself.
-                if (!DoClick(false, a.X + x, a.Y + y, a.Rules[rule].Button, ClickKind.Single, a.HoldMs, 0)) return false;
+                if (!DoClick(false, a.X + sx + x, a.Y + sy + y, a.Rules[rule].Button, ClickKind.Single, a.HoldMs, 0)) return false;
                 detector.NotifyClicked();
                 if (a.RetargetDelayMs > 0) _recentAreaClicks.Add((x, y, TimingEngine.Now));
                 if (_debugFolder is not null && _debugClicks.Length < 20_000)
                 {
                     double at = TimingEngine.TicksToMs(TimingEngine.Now - _debugStartedAt) / 1000;
-                    _debugClicks.Append($"  {at:0.00} s  {a.Rules[rule].Button.ToString().ToLowerInvariant()}-click at ({a.X + x}, {a.Y + y}) for rule {rule + 1}{Environment.NewLine}");
+                    _debugClicks.Append($"  {at:0.00} s  {a.Rules[rule].Button.ToString().ToLowerInvariant()}-click at ({a.X + sx + x}, {a.Y + sy + y}) for rule {rule + 1}{Environment.NewLine}");
                 }
                 if (!keepWatching) return true;
 
@@ -818,9 +828,14 @@ public sealed class ClickEngine : IDisposable
         return pixels;
     }
 
-    private bool AnchorShowing(AreaWatchAction a, int[] anchor)
+    /// <param name="search">
+    /// Also look around the snipped spot if the marker is not where it was last seen. Off for the
+    /// check right before a click, which must be quick; the regular checks do the searching.
+    /// </param>
+    private bool AnchorShowing(AreaWatchAction a, int[] anchor, bool search = true)
     {
-        var (x, y) = Resolve(a.AnchorX, a.AnchorY);
+        var (sx, sy) = _anchorShift.GetValueOrDefault(a);
+        var (x, y) = Resolve(a.AnchorX + sx, a.AnchorY + sy);
         if (!_screen.TryCapture(x, y, a.AnchorWidth, a.AnchorHeight, ref _anchorPixels))
         {
             _markerMatch = 0;
@@ -828,7 +843,25 @@ public sealed class ClickEngine : IDisposable
         }
         double alike = ScreenAnchor.Similarity(_anchorPixels, anchor) * 100;
         _markerMatch = (int)alike;
-        return alike >= a.AnchorMatchPercent;
+        if (alike >= a.AnchorMatchPercent) return true;
+        if (!search) return false;
+
+        // Not where it was last seen. If the game window has been nudged since the marker was
+        // snipped, the marker (and the whole game screen with it) is a little way off: look around.
+        if (TimingEngine.Now < _anchorNextSearch.GetValueOrDefault(a)) return false;
+        _anchorNextSearch[a] = TimingEngine.Now + TimingEngine.MsToTicks(AnchorSearchEveryMs);
+        var (ox, oy) = Resolve(a.AnchorX - AnchorSearchPx, a.AnchorY - AnchorSearchPx);
+        int rw = a.AnchorWidth + 2 * AnchorSearchPx, rh = a.AnchorHeight + 2 * AnchorSearchPx;
+        if (!_screen.TryCapture(ox, oy, rw, rh, ref _anchorRegion)) return false;
+        if (ScreenAnchor.FindNear(_anchorRegion, rw, rh, anchor, a.AnchorWidth, a.AnchorHeight, a.AnchorMatchPercent / 100.0) is not var (fx, fy, share))
+            return false;
+
+        var shift = (fx - AnchorSearchPx, fy - AnchorSearchPx);
+        _anchorShift[a] = shift;
+        _markerMatch = (int)(share * 100);
+        Log.Info($"Found the start/stop marker {Math.Abs(shift.Item1)} px {(shift.Item1 < 0 ? "left" : "right")} and {Math.Abs(shift.Item2)} px {(shift.Item2 < 0 ? "up" : "down")} " +
+                 $"from where it was snipped ({share:P0} alike). The game window has probably moved; the watched area is moved with it for this run.");
+        return true;
     }
 
     /// <summary>
@@ -845,7 +878,8 @@ public sealed class ClickEngine : IDisposable
         if (!BeginDebugFiles(folder)) return;
         int number = ++_markerSnapshots;
 
-        var (mx, my) = Resolve(a.AnchorX, a.AnchorY);
+        var (shx, shy) = _anchorShift.GetValueOrDefault(a);
+        var (mx, my) = Resolve(a.AnchorX + shx, a.AnchorY + shy);
         var (vx, vy, vw, vh) = ScreenService.VirtualScreen;
         int x0 = Math.Max(vx, mx - border), y0 = Math.Max(vy, my - border);
         int x1 = Math.Min(vx + vw, mx + a.AnchorWidth + border), y1 = Math.Min(vy + vh, my + a.AnchorHeight + border);

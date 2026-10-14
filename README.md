@@ -181,6 +181,10 @@ watch plays for that long, and the run stops.
   for** to 0, or leave a number there as an upper limit. Choose something that vanishes the moment
   the game ends and that targets don't fly across; the status shows `WAITING FOR MARKER (62%)`, with how alike the spot is right now, until it
   appears.
+- If the game window has been nudged since the marker was snipped, the marker is looked for up to
+  40 px from its spot. When it is found there, the watched area moves by the same amount for that
+  run, and the log says how far it was off. For a window that moves a lot, turn on
+  **Positions are relative to the window** on the Window tab, or snip the marker again.
 - As a second safeguard, once a watch has clicked something it never clicks on a different screen.
   If a quarter or more of the area suddenly changes (the game closed, a shop opened) it holds off,
   the status shows `DIFFERENT SCREEN`, and it only carries on if the game screen comes back. A

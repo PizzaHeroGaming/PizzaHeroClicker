@@ -135,6 +135,20 @@ public sealed class DialogService(ScreenService screen) : IDialogService
                         int[] live = [];
                         double alike = screen.TryCapture(copy.AnchorX + ox, copy.AnchorY + oy, mw, mh, ref live) ? ScreenAnchor.Similarity(live, reference) : 0;
                         marker = $"Start/stop marker: {(alike * 100 >= copy.AnchorMatchPercent ? "SHOWING" : "not showing")} ({alike:P0} alike, needs {copy.AnchorMatchPercent}%).\n\n";
+                        if (alike * 100 < copy.AnchorMatchPercent)
+                        {
+                            // Maybe it is there, just not exactly where it was snipped (the game window moved).
+                            const int reach = 40;
+                            int rw = mw + 2 * reach, rh = mh + 2 * reach;
+                            int[] region = [];
+                            if (screen.TryCapture(copy.AnchorX + ox - reach, copy.AnchorY + oy - reach, rw, rh, ref region)
+                                && ScreenAnchor.FindNear(region, rw, rh, reference, mw, mh, copy.AnchorMatchPercent / 100.0) is var (fx, fy, share))
+                            {
+                                int dx = fx - reach, dy = fy - reach;
+                                marker = $"Start/stop marker: SHOWING, but {Math.Abs(dx)} px {(dx < 0 ? "left" : "right")} and {Math.Abs(dy)} px {(dy < 0 ? "up" : "down")} of where it was snipped ({share:P0} alike). " +
+                                         "The game window has probably moved. A run finds it there and moves the watched area to match; snipping the marker again (or turning on window-relative positions on the Window tab) puts everything back in line.\n\n";
+                            }
+                        }
                     }
                     var detector = new AreaDetector(copy) { CollectReport = true };
                     detector.Find(pixels);
