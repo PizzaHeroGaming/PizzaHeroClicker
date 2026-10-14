@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using PizzaHeroClicker.Models;
 
@@ -172,12 +173,28 @@ public sealed class AreaDetector
     /// <summary>How close to a just-clicked spot a target must be to count as "the same one".</summary>
     public int AvoidRadius { get; private set; } = 40;
 
-    /// <param name="nowMs">A millisecond clock for scene learning; leave out to use the system's.</param>
+    /// <summary>
+    /// How fast the last target returned by <see cref="Find"/> was moving, in area pixels per
+    /// second, worked out from where it was at the previous look. (0, 0) when it is standing still
+    /// or could not be followed. Used to aim where a moving target will be, not where it was.
+    /// </summary>
+    public (double X, double Y) TargetVelocity { get; private set; }
+
+    // Everything offered as a target at the previous look and the one before it, to follow targets between looks.
+    private List<(int X, int Y)> _previousOffers = new(), _offers = new();
+    private double _previousLookMs = double.NaN;
+    /// <summary>Faster than this is not one target moving but two different ones being confused.</summary>
+    private const double MaxTrackSpeed = 2500;
+    private const double MaxTrackGapMs = 200;
+
+    /// <param name="nowMs">A millisecond clock for scene learning and following targets; leave out to use the system's.</param>
     /// <param name="avoid">Spots (area pixels) clicked a moment ago; targets within <see cref="AvoidRadius"/> of one are passed over.</param>
     public (int X, int Y, int Rule)? Find(int[] pixels, long nowMs = -1, IReadOnlyList<(int X, int Y)>? avoid = null)
     {
+        double lookMs = nowMs >= 0 ? nowMs : Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency;
         if (nowMs < 0) nowMs = Environment.TickCount64;
         int width = _action.Width, height = _action.Height;
+        _offers.Clear();
         var priority = _action.Priority;
         var report = CollectReport ? new AreaReport() : null;
         LastReport = report;
@@ -185,6 +202,7 @@ public sealed class AreaDetector
         (int Key, int X, int Y, int Rule)? best = null;
         void Offer(int x, int y, int rule)
         {
+            _offers.Add((x, y)); // followed from look to look even when passed over below
             if (avoid is not null)
             {
                 foreach (var (ax, ay) in avoid)
@@ -329,8 +347,30 @@ public sealed class AreaDetector
         }
 
         (int X, int Y, int Rule)? target = best is var (_, bx, by, brule) ? (bx, by, brule) : null;
+        TargetVelocity = target is var (tx, ty, _) ? Follow(tx, ty, lookMs) : (0, 0);
+        (_previousOffers, _offers) = (_offers, _previousOffers);
+        _previousLookMs = lookMs;
         if (report is not null) report.Target = target;
         return target;
+    }
+
+    /// <summary>
+    /// Where was this target at the previous look? The nearest thing offered then, if it is close
+    /// enough to be the same target having moved. Gives its speed in pixels per second.
+    /// </summary>
+    private (double X, double Y) Follow(int x, int y, double lookMs)
+    {
+        double gapMs = lookMs - _previousLookMs;
+        if (double.IsNaN(gapMs) || gapMs <= 0 || gapMs > MaxTrackGapMs || _previousOffers.Count == 0) return (0, 0);
+        double reach = MaxTrackSpeed * gapMs / 1000, bestDistance = double.MaxValue;
+        (int X, int Y) from = default;
+        foreach (var p in _previousOffers)
+        {
+            double d = Math.Sqrt((double)(x - p.X) * (x - p.X) + (double)(y - p.Y) * (y - p.Y));
+            if (d < bestDistance) (bestDistance, from) = (d, p);
+        }
+        if (bestDistance > reach) return (0, 0);
+        return ((x - from.X) * 1000 / gapMs, (y - from.Y) * 1000 / gapMs);
     }
 
     private static bool TouchesEdge(Blob blob, int width, int height)

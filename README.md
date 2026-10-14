@@ -189,6 +189,10 @@ watch plays for that long, and the run stops.
   that is already hit and fading out isn't clicked again; wasted clicks often break a combo. Raise
   it if hit targets linger longer than that. A moving target is also left until it is fully inside
   the area.
+- Moving targets are clicked where they will be, not where they were (**Moving targets** in the
+  action, on by default). It measures how fast each target moves between looks and aims ahead by
+  the moment between seeing it and the game receiving the click. Turn it off if clicks start
+  landing in front of targets.
 - The game must be in windowed or borderless mode; exclusive fullscreen usually can't be read.
 
 **Profiles and saving**

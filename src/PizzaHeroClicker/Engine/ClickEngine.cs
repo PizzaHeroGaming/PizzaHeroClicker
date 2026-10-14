@@ -716,6 +716,7 @@ public sealed class ClickEngine : IDisposable
             }
 
             var (left, top) = Resolve(a.X, a.Y); // re-resolved every pass: the target window may move
+            long lookedAt = TimingEngine.Now;
             bool captured = _screen.TryCapture(left, top, a.Width, a.Height, ref _areaPixels);
             bool record = captured && _debugFolder is not null && _debugCount < MaxDebugSnapshots && TimingEngine.Now >= _debugNextAt;
             detector.CollectReport = record;
@@ -750,6 +751,7 @@ public sealed class ClickEngine : IDisposable
                 }
 
                 _t = TimingEngine.Now; // the wait had no fixed length: restart the timeline from here
+                if (a.LeadMovingTargets) (x, y) = AimAhead(a, x, y, detector.TargetVelocity, lookedAt);
                 // DoClick takes profile-space coordinates and resolves them itself.
                 if (!DoClick(false, a.X + x, a.Y + y, a.Rules[rule].Button, ClickKind.Single, a.HoldMs, 0)) return false;
                 detector.NotifyClicked();
@@ -782,6 +784,23 @@ public sealed class ClickEngine : IDisposable
             if (!Advance(a.PollMs, scaled: false)) return false;
             if (!Housekeeping()) return false;
         }
+    }
+
+    /// <summary>
+    /// The screen shown to the capture is already a frame old, the capture and the search take a
+    /// little while, and the game only acts on the click at its next frame. All that time the
+    /// target keeps moving, so aim where it will be by then.
+    /// </summary>
+    private static (int X, int Y) AimAhead(AreaWatchAction a, int x, int y, (double X, double Y) velocity, long lookedAt)
+    {
+        const double FrameLagMs = 16;   // about one frame at 60 fps, before and after
+        const double MaxLeadPx = 90;    // a guess that would move the click further than this is not trusted
+        if (velocity == (0, 0)) return (x, y);
+        double leadMs = TimingEngine.TicksToMs(TimingEngine.Now - lookedAt) + FrameLagMs;
+        double dx = velocity.X * leadMs / 1000, dy = velocity.Y * leadMs / 1000;
+        double length = Math.Sqrt(dx * dx + dy * dy);
+        if (length > MaxLeadPx) (dx, dy) = (dx * MaxLeadPx / length, dy * MaxLeadPx / length);
+        return (Math.Clamp(x + (int)Math.Round(dx), 0, a.Width - 1), Math.Clamp(y + (int)Math.Round(dy), 0, a.Height - 1));
     }
 
     /// <summary>The action's start/stop marker as pixels, decoded once per run. Null if it has none.</summary>

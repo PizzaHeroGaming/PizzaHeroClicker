@@ -393,6 +393,53 @@ public class ClickEngineTests(ITestOutputHelper output)
         Assert.InRange(TimingEngine.TicksToMs(onSecond[0].Ticks - clicks[1].Ticks), 0, 120);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ClicksLandOnAMovingTargetNotBehindIt(bool lead)
+    {
+        // A small target sweeps across the area at 900 px/s. Looking at the screen takes 12 ms (as a
+        // real capture of a big area does), and the game acts on a click about a frame later.
+        const int W = 600, H = 60, Size = 16;
+        const double Speed = 900, GameLagMs = 16;
+        long start = TimingEngine.Now;
+        double TargetX(long ticks) => 40 + (TimingEngine.TicksToMs(ticks - start) * Speed / 1000) % (W - 80);
+
+        _screen.Capture = (_, _, w, h) =>
+        {
+            var frame = new int[w * h];
+            int left = (int)TargetX(TimingEngine.Now) - Size / 2;
+            for (int y = 22; y < 22 + Size; y++)
+            for (int x = left; x < left + Size; x++)
+                frame[y * w + x] = 0xE04030;
+            Thread.Sleep(12);
+            return frame;
+        };
+        int hits = 0, clicks = 0;
+        _input.Clicked = (_, x, _) =>
+        {
+            double actual = 100 + TargetX(TimingEngine.Now + TimingEngine.MsToTicks(GameLagMs));
+            if (actual > 100 + W - 60) return; // wrapping round to the start: not a fair test
+            clicks++;
+            if (Math.Abs(x - actual) <= Size / 2) hits++;
+        };
+
+        var profile = Plain(10, 1);
+        profile.Repeat.Mode = RepeatMode.Loops;
+        profile.Actions.Add(new AreaWatchAction
+        {
+            X = 100, Y = 100, Width = W, Height = H, PollMs = 5, MinPixels = 10, RetargetDelayMs = 0, WatchForMs = 1500,
+            LeadMovingTargets = lead,
+            Rules = { new AreaRule { Color = "#E8432E", Tolerance = 30, Button = ClickButton.Left } },
+        });
+        Assert.Equal(StopReason.Completed, Run(profile).Reason);
+
+        Assert.True(clicks > 20, $"only {clicks} clicks");
+        double rate = (double)hits / clicks;
+        if (lead) Assert.True(rate >= 0.8, $"aiming ahead hit only {rate:P0} of {clicks} clicks");
+        else Assert.True(rate <= 0.3, $"without aiming ahead {rate:P0} still hit: the test is not showing the problem");
+    }
+
     [Fact]
     public void AMarkerStartsTheWatchWhenItAppearsAndEndsItWhenItGoes()
     {

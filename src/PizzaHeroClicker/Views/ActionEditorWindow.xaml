@@ -219,13 +219,6 @@
                     ToolTip="Skip: carry on with the next action. Stop: end the whole run." />
         </StackPanel>
         <StackPanel Style="{StaticResource Row}">
-          <TextBlock Style="{StaticResource Lbl}" Text="After a click" />
-          <TextBlock Style="{StaticResource Axis}" Text="leave that spot alone for" />
-          <TextBox Style="{StaticResource NumBox}" Width="62" Text="{Binding RetargetDelayMs, UpdateSourceTrigger=PropertyChanged}"
-                   ToolTip="Stops a second click landing on a target that has already been hit and is still fading out. Wasted clicks often count as misses and break a combo. A target that was missed and keeps moving is clicked again once it has moved on. 0 = click again straight away." />
-          <TextBlock Style="{StaticResource Unit}" Text="ms" />
-        </StackPanel>
-        <StackPanel Style="{StaticResource Row}">
           <TextBlock Style="{StaticResource Lbl}" Text="Check every" />
           <TextBox Style="{StaticResource NumBox}" Text="{Binding PollMs, UpdateSourceTrigger=PropertyChanged}" />
           <TextBlock Style="{StaticResource Unit}" Text="ms" />
@@ -385,6 +378,11 @@
           <TextBox Style="{StaticResource NumBox}" Width="62" Text="{Binding RetargetDelayMs, UpdateSourceTrigger=PropertyChanged}"
                    ToolTip="Stops a second click landing on a target that has already been hit and is still fading out. Wasted clicks often count as misses and break a combo. A target that was missed and keeps moving is clicked again once it has moved on. 0 = click again straight away." />
           <TextBlock Style="{StaticResource Unit}" Text="ms" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Moving targets" />
+          <CheckBox Content="Aim where they will be, not where they were" IsChecked="{Binding LeadMovingTargets}"
+                    ToolTip="A target keeps moving in the moment between seeing it and clicking it, so a click aimed at where it was can land just behind it. This measures how fast each target is moving and aims ahead by that moment. Turn it off if clicks land in front of targets instead." />
         </StackPanel>
         <StackPanel Style="{StaticResource Row}">
           <TextBlock Style="{StaticResource Lbl}" Text="Check every" />

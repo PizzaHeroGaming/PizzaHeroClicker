@@ -347,6 +347,13 @@ public partial class AreaWatchAction : ActionBase
     /// </summary>
     [ObservableProperty] private int _retargetDelayMs = 400;
 
+    /// <summary>
+    /// Aim where a moving target will be when the click lands, not where it was when the screen
+    /// was looked at. Between the look and the click the target keeps moving; at game speeds that
+    /// is enough to click the empty space just behind it.
+    /// </summary>
+    [ObservableProperty] private bool _leadMovingTargets = true;
+
     /// <summary>How pictures are compared with what is on screen.</summary>
     [ObservableProperty] private PictureMatch _pictureMatch = PictureMatch.Appearance;
 
