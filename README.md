@@ -179,7 +179,7 @@ watch plays for that long, and the run stops.
   clicks while it is showing. The marker is checked again right before every click, so clicking
   stops the instant it disappears and nothing on the next screen gets clicked. Set **Keep watching
   for** to 0, or leave a number there as an upper limit. Choose something that vanishes the moment
-  the game ends and that targets don't fly across; the status shows `WAITING FOR MARKER` until it
+  the game ends and that targets don't fly across; the status shows `WAITING FOR MARKER (62%)`, with how alike the spot is right now, until it
   appears.
 - As a second safeguard, once a watch has clicked something it never clicks on a different screen.
   If a quarter or more of the area suddenly changes (the game closed, a shop opened) it holds off,

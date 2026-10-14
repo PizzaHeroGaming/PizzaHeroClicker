@@ -406,7 +406,7 @@ public partial class MainViewModel : ObservableObject
         {
             EngineState.Countdown => ("Countdown", $"STARTING IN {snap.MsUntilNext / 1000:0.0}"),
             EngineState.Running when snap.OverOwnWindow => ("Waiting", "CURSOR IS ON THIS APP"),
-            EngineState.Running when snap.WaitingForMarker => ("Waiting", "WAITING FOR MARKER"),
+            EngineState.Running when snap.WaitingForMarker => ("Waiting", snap.MarkerMatch >= 0 ? $"WAITING FOR MARKER ({snap.MarkerMatch}%)" : "WAITING FOR MARKER"),
             EngineState.Running when snap.DifferentScreen => ("Waiting", "DIFFERENT SCREEN"),
             EngineState.Running => ("Running", "RUNNING"),
             EngineState.Paused => ("Paused", "PAUSED"),

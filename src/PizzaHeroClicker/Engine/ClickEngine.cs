@@ -11,7 +11,7 @@ public enum StopReason { None, User, EmergencyHotkey, EmergencyCorner, Completed
 /// <summary>A consistent-enough view of the engine for the UI to poll. Never blocks the engine.</summary>
 public readonly record struct EngineSnapshot(
     EngineState State, long Actions, long Clicks, long TotalClicks, double MsUntilNext, int CurrentIndex, long RunStartEpochMs,
-    bool OverOwnWindow, bool WaitingForMarker, bool DifferentScreen);
+    bool OverOwnWindow, bool WaitingForMarker, bool DifferentScreen, int MarkerMatch);
 
 /// <summary>
 /// Runs a profile's action list on a dedicated background thread.
@@ -55,6 +55,7 @@ public sealed class ClickEngine : IDisposable
     private volatile int _currentIndex = -1;
     private volatile bool _overOwnWindow;
     private volatile bool _waitingForMarker;
+    private volatile int _markerMatch = -1;   // how alike the marker spot was at the last look, in percent (-1 = not looked)
     private volatile bool _differentScreen;
     private int _stopReason;
     private long _actions, _clicks, _totalClicks, _nextDue, _runStartEpochMs;
@@ -115,6 +116,9 @@ public sealed class ClickEngine : IDisposable
     private static readonly object DebugFileLock = new();
     private string? _debugFolder;
     private volatile int _debugRun;     // changes whenever a new recording starts
+    private bool _debugFilesStarted;    // this run has replaced the previous run's files
+    private int _markerSnapshots;
+    private long _markerSnapshotNextAt;
     private int _debugCount;
     private long _debugNextAt, _debugStartedAt;
 
@@ -131,7 +135,7 @@ public sealed class ClickEngine : IDisposable
             : 0;
         return new EngineSnapshot(state, Interlocked.Read(ref _actions), Interlocked.Read(ref _clicks),
             Interlocked.Read(ref _totalClicks), msUntilNext, _currentIndex, Interlocked.Read(ref _runStartEpochMs),
-            _overOwnWindow, _waitingForMarker, _differentScreen);
+            _overOwnWindow, _waitingForMarker, _differentScreen, _markerMatch);
     }
 
     /// <summary>Starts a run with a snapshot of <paramref name="profile"/>. Returns false if one is already active.</summary>
@@ -293,6 +297,7 @@ public sealed class ClickEngine : IDisposable
             _currentIndex = -1;
             _overOwnWindow = false;
             _waitingForMarker = false;
+            _markerMatch = -1;
             _differentScreen = false;
             Interlocked.Exchange(ref _nextDue, 0);
             SetState(EngineState.Stopped);
@@ -647,10 +652,22 @@ public sealed class ClickEngine : IDisposable
         {
             long appearBy = TimeoutFromNow();
             _waitingForMarker = true;
+            long waitStarted = TimingEngine.Now, nextLog = waitStarted + TimingEngine.MsToTicks(10_000);
+            int best = 0;
             try
             {
                 while (!AnchorShowing(a, anchor))
                 {
+                    best = Math.Max(best, _markerMatch);
+                    if (TimingEngine.Now >= nextLog)
+                    {
+                        // Visible in the log without the recorder: a marker that never comes is the
+                        // usual reason a watch "does nothing", and the number says how far off it is.
+                        nextLog = TimingEngine.Now + TimingEngine.MsToTicks(10_000);
+                        Log.Info($"Still waiting for the start/stop marker after {TimingEngine.TicksToMs(TimingEngine.Now - waitStarted) / 1000:0} s: " +
+                                 $"{_markerMatch}% alike now, best {best}%, needs {a.AnchorMatchPercent}%.");
+                    }
+                    if (_debugFolder is not null) SaveMarkerSnapshot(a);
                     if (TimingEngine.Now >= appearBy)
                     {
                         if (a.OnTimeout == PixelTimeoutBehavior.Stop)
@@ -785,8 +802,75 @@ public sealed class ClickEngine : IDisposable
     private bool AnchorShowing(AreaWatchAction a, int[] anchor)
     {
         var (x, y) = Resolve(a.AnchorX, a.AnchorY);
-        return _screen.TryCapture(x, y, a.AnchorWidth, a.AnchorHeight, ref _anchorPixels)
-            && ScreenAnchor.Similarity(_anchorPixels, anchor) * 100 >= a.AnchorMatchPercent;
+        if (!_screen.TryCapture(x, y, a.AnchorWidth, a.AnchorHeight, ref _anchorPixels))
+        {
+            _markerMatch = 0;
+            return false;
+        }
+        double alike = ScreenAnchor.Similarity(_anchorPixels, anchor) * 100;
+        _markerMatch = (int)alike;
+        return alike >= a.AnchorMatchPercent;
+    }
+
+    /// <summary>
+    /// While a recorded run waits for its marker: about once a second, a picture of the marker's
+    /// spot with a border around it, and how alike it was. Without these, a marker that never
+    /// matches leaves an empty recording.
+    /// </summary>
+    private void SaveMarkerSnapshot(AreaWatchAction a)
+    {
+        const int border = 120, maxSnapshots = 30;
+        if (_markerSnapshots >= maxSnapshots || TimingEngine.Now < _markerSnapshotNextAt) return;
+        _markerSnapshotNextAt = TimingEngine.Now + TimingEngine.MsToTicks(1000);
+        string folder = _debugFolder!;
+        if (!BeginDebugFiles(folder)) return;
+        int number = ++_markerSnapshots;
+
+        var (mx, my) = Resolve(a.AnchorX, a.AnchorY);
+        var (vx, vy, vw, vh) = ScreenService.VirtualScreen;
+        int x0 = Math.Max(vx, mx - border), y0 = Math.Max(vy, my - border);
+        int x1 = Math.Min(vx + vw, mx + a.AnchorWidth + border), y1 = Math.Min(vy + vh, my + a.AnchorHeight + border);
+        int[] pixels = [];
+        if (x1 - x0 < 1 || y1 - y0 < 1 || !_screen.TryCapture(x0, y0, x1 - x0, y1 - y0, ref pixels)) return;
+        int width = x1 - x0, height = y1 - y0;
+        double seconds = TimingEngine.TicksToMs(TimingEngine.Now - _debugStartedAt) / 1000;
+        string text = $"{Environment.NewLine}marker-{number:00}.png at {seconds:0.0} s: waiting for the start/stop marker. The spot it should be in was {_markerMatch}% alike (needs {a.AnchorMatchPercent}%). " +
+                      $"The picture shows the screen from ({x0}, {y0}), {width} x {height}; the marker belongs at ({mx}, {my}), {a.AnchorWidth} x {a.AnchorHeight}.{Environment.NewLine}";
+        Task.Run(() =>
+        {
+            try
+            {
+                TemplateImage.SavePng(Path.Combine(folder, $"marker-{number:00}.png"), pixels, width, height);
+                lock (DebugFileLock) File.AppendAllText(Path.Combine(folder, "report.txt"), text);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Could not save a marker snapshot", ex);
+            }
+        });
+    }
+
+    /// <summary>
+    /// The first time a run writes anything, the previous run's recording makes way. Done lazily so
+    /// a run that never reaches an area watch does not wipe the last useful recording.
+    /// </summary>
+    private bool BeginDebugFiles(string folder)
+    {
+        if (_debugFilesStarted) return true;
+        _debugFilesStarted = true;
+        try
+        {
+            foreach (string old in Directory.EnumerateFiles(folder, "*.png")) File.Delete(old);
+            File.WriteAllText(Path.Combine(folder, "report.txt"),
+                $"Area watch troubleshooting run, started {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss}{Environment.NewLine}");
+            Log.Info($"Area watch troubleshooting snapshots are being saved to {folder}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Could not clear the previous troubleshooting snapshots", ex);
+            return true; // carry on: new files simply sit beside the old ones
+        }
     }
 
     private void StartDebugRecording()
@@ -794,6 +878,9 @@ public sealed class ClickEngine : IDisposable
         _debugFolder = null;
         _debugRun++;
         _debugCount = 0;
+        _debugFilesStarted = false;
+        _markerSnapshots = 0;
+        _markerSnapshotNextAt = 0;
         _debugNextAt = 0;
         _debugStartedAt = TimingEngine.Now;
         if (AreaDebugFolder is not { Length: > 0 } folder) return;
@@ -817,21 +904,7 @@ public sealed class ClickEngine : IDisposable
         int number = ++_debugCount;
         _debugNextAt = TimingEngine.Now + TimingEngine.MsToTicks(1000);
         string folder = _debugFolder!;
-        if (number == 1)
-        {
-            // First snapshot of this run: now the previous run's files make way.
-            try
-            {
-                foreach (string old in Directory.EnumerateFiles(folder, "*.png")) File.Delete(old);
-                File.WriteAllText(Path.Combine(folder, "report.txt"),
-                    $"Area watch troubleshooting run, started {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss}{Environment.NewLine}");
-                Log.Info($"Area watch troubleshooting snapshots are being saved to {folder}");
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Could not clear the previous troubleshooting snapshots", ex);
-            }
-        }
+        BeginDebugFiles(folder);
         if (number == 4) SaveSurroundings(a, folder, "surroundings.png");
         else if (number % 5 == 4) SaveSurroundings(a, folder, $"surroundings-{number:00}.png");
         var pixels = (int[])_areaPixels.Clone();

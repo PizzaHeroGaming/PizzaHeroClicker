@@ -427,6 +427,8 @@ public class ClickEngineTests(ITestOutputHelper output)
             Thread.Sleep(300);
             Assert.DoesNotContain(_input.Snapshot(), e => e.Event.StartsWith("click"));   // waiting for the marker
             Assert.True(engine.GetSnapshot().WaitingForMarker);
+            // How close the spot is, for the status line: the dark two-thirds of the label match a black screen.
+            Assert.InRange(engine.GetSnapshot().MarkerMatch, 60, 70);
             shownAt = TimingEngine.Now;
             volatile_markerShowing = true;       // the game screen opens
             Thread.Sleep(500);
