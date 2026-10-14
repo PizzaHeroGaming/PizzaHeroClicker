@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 using PizzaHeroClicker.Models;
 using PizzaHeroClicker.Services;
 
@@ -124,6 +125,7 @@ public sealed class ClickEngine : IDisposable
     private string? _debugFolder;
     private volatile int _debugRun;     // changes whenever a new recording starts
     private bool _debugFilesStarted;    // this run has replaced the previous run's files
+    private readonly StringBuilder _debugLooks = new(); // looks.txt: time (ms) then every candidate's screen position
     private int _markerSnapshots;
     private long _markerSnapshotNextAt;
     private int _debugCount;
@@ -738,6 +740,12 @@ public sealed class ClickEngine : IDisposable
             foreach (var c in _recentAreaClicks) _avoid.Add((c.X, c.Y));
 
             var found = captured ? detector.Find(_areaPixels, -1, _avoid) : null;
+            if (captured && _debugFolder is not null && _debugCount < MaxDebugSnapshots && _debugLooks.Length < 400_000)
+            {
+                _debugLooks.Append(TimingEngine.TicksToMs(lookedAt - _debugStartedAt).ToString("0", System.Globalization.CultureInfo.InvariantCulture));
+                foreach (var (ox, oy) in detector.LastOffers) _debugLooks.Append($" {a.X + sx + ox},{a.Y + sy + oy}");
+                _debugLooks.Append(Environment.NewLine);
+            }
             _differentScreen = captured && detector.IsScreenChanged;
             if (record) SaveDebugSnapshot(a, detector);
             if (found is var (x, y, rule))
@@ -761,6 +769,7 @@ public sealed class ClickEngine : IDisposable
                 }
 
                 _t = TimingEngine.Now; // the wait had no fixed length: restart the timeline from here
+                int seenX = x, seenY = y;
                 if (a.LeadMovingTargets) (x, y) = AimAhead(a, x, y, detector.TargetVelocity, lookedAt);
                 // DoClick takes profile-space coordinates and resolves them itself.
                 if (!DoClick(false, a.X + sx + x, a.Y + sy + y, a.Rules[rule].Button, ClickKind.Single, a.HoldMs, 0)) return false;
@@ -769,7 +778,11 @@ public sealed class ClickEngine : IDisposable
                 if (_debugFolder is not null && _debugClicks.Length < 20_000)
                 {
                     double at = TimingEngine.TicksToMs(TimingEngine.Now - _debugStartedAt) / 1000;
-                    _debugClicks.Append($"  {at:0.00} s  {a.Rules[rule].Button.ToString().ToLowerInvariant()}-click at ({a.X + sx + x}, {a.Y + sy + y}) for rule {rule + 1}{Environment.NewLine}");
+                    var (vx, vy) = detector.TargetVelocity;
+                    string aim = (x, y) == (seenX, seenY)
+                        ? (vx, vy) == (0, 0) ? "" : "  (moving, not aimed ahead)"
+                        : $"  (seen at ({a.X + sx + seenX}, {a.Y + sy + seenY}), moving {Math.Sqrt(vx * vx + vy * vy):0} px/s, aimed {x - seenX:+0;-0}, {y - seenY:+0;-0} ahead)";
+                    _debugClicks.Append($"  {at:0.00} s  {a.Rules[rule].Button.ToString().ToLowerInvariant()}-click at ({a.X + sx + x}, {a.Y + sy + y}) for rule {rule + 1}{aim}{Environment.NewLine}");
                 }
                 if (!keepWatching) return true;
 
@@ -914,6 +927,7 @@ public sealed class ClickEngine : IDisposable
         try
         {
             foreach (string old in Directory.EnumerateFiles(folder, "*.png")) File.Delete(old);
+            File.Delete(Path.Combine(folder, "looks.txt"));
             File.WriteAllText(Path.Combine(folder, "report.txt"),
                 $"Area watch troubleshooting run, started {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss}{Environment.NewLine}");
             Log.Info($"Area watch troubleshooting snapshots are being saved to {folder}");
@@ -932,6 +946,7 @@ public sealed class ClickEngine : IDisposable
         _debugRun++;
         _debugCount = 0;
         _debugFilesStarted = false;
+        _debugLooks.Clear();
         _markerSnapshots = 0;
         _markerSnapshotNextAt = 0;
         _debugNextAt = 0;
@@ -967,12 +982,18 @@ public sealed class ClickEngine : IDisposable
                       + detector.DescribeLastReport() + Environment.NewLine
                       + (_debugClicks.Length > 0 ? $"Clicks since the previous frame:{Environment.NewLine}{_debugClicks}" : "");
         _debugClicks.Clear();
+        string looks = _debugLooks.ToString();
+        _debugLooks.Clear();
         Task.Run(() =>
         {
             try
             {
                 TemplateImage.SavePng(Path.Combine(folder, $"frame-{number:00}.png"), pixels, width, height);
-                lock (DebugFileLock) File.AppendAllText(Path.Combine(folder, "report.txt"), text);
+                lock (DebugFileLock)
+                {
+                    File.AppendAllText(Path.Combine(folder, "report.txt"), text);
+                    File.AppendAllText(Path.Combine(folder, "looks.txt"), looks);
+                }
             }
             catch (Exception ex)
             {

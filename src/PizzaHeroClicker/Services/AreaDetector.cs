@@ -231,12 +231,12 @@ public sealed class AreaDetector
     /// </summary>
     public (double X, double Y) TargetVelocity { get; private set; }
 
-    // Everything offered as a target at the previous look and the one before it, to follow targets between looks.
-    private List<(int X, int Y)> _previousOffers = new(), _offers = new();
-    private double _previousLookMs = double.NaN;
-    /// <summary>Faster than this is not one target moving but two different ones being confused.</summary>
-    private const double MaxTrackSpeed = 2500;
-    private const double MaxTrackGapMs = 200;
+    // Everything offered as a target at this look, followed from look to look to measure speeds.
+    private readonly List<(int X, int Y)> _offers = new();
+    private readonly TargetTracker _tracker = new();
+
+    /// <summary>Everything that could have been the target at the last look (area pixels), for troubleshooting.</summary>
+    public IReadOnlyList<(int X, int Y)> LastOffers => _offers;
 
     /// <param name="nowMs">A millisecond clock for scene learning and following targets; leave out to use the system's.</param>
     /// <param name="avoid">Spots (area pixels) clicked a moment ago; targets within <see cref="AvoidRadius"/> of one are passed over.</param>
@@ -398,30 +398,10 @@ public sealed class AreaDetector
         }
 
         (int X, int Y, int Rule)? target = best is var (_, bx, by, brule) ? (bx, by, brule) : null;
-        TargetVelocity = target is var (tx, ty, _) ? Follow(tx, ty, lookMs) : (0, 0);
-        (_previousOffers, _offers) = (_offers, _previousOffers);
-        _previousLookMs = lookMs;
+        _tracker.Update(_offers, lookMs);
+        TargetVelocity = target is var (tx, ty, _) ? _tracker.VelocityOf(tx, ty) : (0, 0);
         if (report is not null) report.Target = target;
         return target;
-    }
-
-    /// <summary>
-    /// Where was this target at the previous look? The nearest thing offered then, if it is close
-    /// enough to be the same target having moved. Gives its speed in pixels per second.
-    /// </summary>
-    private (double X, double Y) Follow(int x, int y, double lookMs)
-    {
-        double gapMs = lookMs - _previousLookMs;
-        if (double.IsNaN(gapMs) || gapMs <= 0 || gapMs > MaxTrackGapMs || _previousOffers.Count == 0) return (0, 0);
-        double reach = MaxTrackSpeed * gapMs / 1000, bestDistance = double.MaxValue;
-        (int X, int Y) from = default;
-        foreach (var p in _previousOffers)
-        {
-            double d = Math.Sqrt((double)(x - p.X) * (x - p.X) + (double)(y - p.Y) * (y - p.Y));
-            if (d < bestDistance) (bestDistance, from) = (d, p);
-        }
-        if (bestDistance > reach) return (0, 0);
-        return ((x - from.X) * 1000 / gapMs, (y - from.Y) * 1000 / gapMs);
     }
 
     private static bool TouchesEdge(Blob blob, int width, int height)
