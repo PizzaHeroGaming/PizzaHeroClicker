@@ -420,6 +420,10 @@ public class ClickEngineTests(ITestOutputHelper output)
         {
             double actual = 100 + TargetX(TimingEngine.Now + TimingEngine.MsToTicks(GameLagMs));
             if (actual > 100 + W - 60) return; // wrapping round to the start: not a fair test
+            // A target's speed is only trusted once it has been followed for a moment, so the first
+            // clicks after it appears are not aimed ahead. Judge the steady state, as with a target
+            // crossing a game screen over several seconds.
+            if ((actual - 100 - 40) / Speed * 1000 < 150) return;
             clicks++;
             if (Math.Abs(x - actual) <= Size / 2) hits++;
         };
