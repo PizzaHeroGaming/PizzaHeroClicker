@@ -32,11 +32,11 @@
     <DataTemplate DataType="{x:Type models:BarBlockAction}">
       <StackPanel>
         <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,8"
-                   Text="For games where you steer a bar round a circle to block things flying out from the middle. While the game is on screen, press SET UP FROM A SNAPSHOT: the screen is frozen there and then, and you click the centre and the bar on the still picture, as slowly as you like." />
+                   Text="For games where you steer a bar round a circle to block things flying out from the middle. While the game is on screen, press SET UP FROM A SNAPSHOT: the screen is frozen there and then, and you click the centre, the bar and the things to block on the still picture, as slowly as you like." />
         <StackPanel Style="{StaticResource Row}" Margin="0,0,0,12">
           <Button Style="{StaticResource PrimaryButton}" Content="SET UP FROM A SNAPSHOT" Margin="0"
                   Command="{Binding DataContext.SetUpFromSnapshotCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                  ToolTip="Press while the game is showing. The screen is photographed at once; then click the centre, then the bar, then (optionally) drag a box round the timer label for the start/stop marker, all on that still picture." />
+                  ToolTip="Press while the game is showing. The screen is photographed at once; then, on that still picture, click the centre, the bar, and one of each kind of thing to block (most valuable first, Enter when done), and optionally drag a box round the timer label for the start/stop marker." />
         </StackPanel>
         <StackPanel Style="{StaticResource Row}">
           <TextBlock Style="{StaticResource Lbl}" Text="Centre" />
@@ -112,9 +112,6 @@
         <StackPanel Style="{StaticResource Row}" Margin="0,4,0,12">
           <Button Content="+ ADD A COLOUR" Margin="0,0,8,0" Style="{StaticResource PickButton}" CommandParameter="target"
                   ToolTip="Then click on one of the things to block, on its most distinctive colour." />
-          <Button Content="USE THE RADIATION COLOURS" Margin="0,0,8,0"
-                  Command="{Binding DataContext.UseRadiationColoursCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                  ToolTip="Fills in the four kinds of radiation from Galaxy Idle Clicker's Radiations game: green, purple, yellow, cyan." />
           <Button Content="TEST ON THE SCREEN NOW" Margin="0"
                   Command="{Binding DataContext.TestBarBlockCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                   ToolTip="Watches the circle for about three seconds and says whether it can find the bar and what it sees flying out. No keys are pressed." />
@@ -444,7 +441,7 @@
                   Command="{Binding DataContext.AddPictureCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                   ToolTip="Freezes the screen so you can drag a box around one target. On a busy backdrop (a game scene) select the area first and do this while targets are flying: it watches for about three seconds, then freezes, and removes the scene behind the target for you." />
           <Button Style="{StaticResource PickButton}" Margin="0" CommandParameter="rule" Content="+ ADD A COLOUR"
-                  ToolTip="Then click on the colour. Use it for a marker the game draws on one kind of target, such as a red circle around satellites: anything carrying that colour gets this rule's button, clicked at its centre." />
+                  ToolTip="Then click on the colour. Use it for a marker the game draws on one kind of target, such as a coloured ring around it: anything carrying that colour gets this rule's button, clicked at its centre." />
         </StackPanel>
         <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,12"
                    Text="Have the game showing with a target visible, then add one picture per kind of target. Press TEST to see how closely each picture matches what is on screen. Missed: lower its %. Wrong things clicked: raise it." />

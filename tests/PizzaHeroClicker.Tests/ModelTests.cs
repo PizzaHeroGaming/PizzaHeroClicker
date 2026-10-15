@@ -80,7 +80,7 @@ public class ProfileJsonTests
         profile.Actions.Add(new MoveAction { X = 9, Y = 8, DurationMs = 12 });
         profile.Actions.Add(new PixelWaitAction { X = 5, Y = 6, Color = "#FF8800", Tolerance = 3, OnTimeout = PixelTimeoutBehavior.Stop });
         profile.Actions.Add(new PixelClickAction { X = 7, Y = 8, Color = "#00FF00", ClickAtPixel = false, ClickX = 70, ClickY = 80 });
-        profile.Actions.Add(new BarBlockAction { CentreX = 900, CentreY = 640, Radius = 546, ClockwiseKey = KeyCombo.Parse("Left"), Targets = new(BarBlockAction.RadiationDefaults()) });
+        profile.Actions.Add(new BarBlockAction { CentreX = 900, CentreY = 640, Radius = 546, ClockwiseKey = KeyCombo.Parse("Left"), Targets = new(ShieldGame.FourKinds()) });
         profile.Hotkeys.Toggle = KeyCombo.Parse("Ctrl+F6");
         profile.Repeat.Mode = RepeatMode.UntilTime;
         profile.Window.Title = "Game";

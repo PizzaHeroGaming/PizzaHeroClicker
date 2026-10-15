@@ -115,27 +115,27 @@ version, credits and where this copy keeps its data.
 
 **Click things that appear in an area**
 
-For games where targets drift in and each kind needs a different button, for example left-click
-meteorites and right-click satellites.
+For games where targets drift in and each kind needs a different button: say, left-click one kind
+and right-click another.
 
 1. On the Actions tab press **+ ADD > Area watch**. Press **SELECT AREA ON SCREEN** and drag a box
-   over the part of the game where targets appear. Leave out the planet, score and anything else
-   that shares their colours.
+   over the part of the game where targets appear. Leave out scores, buttons and anything else that
+   shares their colours.
 2. With the game showing and a target visible, press **+ ADD A PICTURE OF A TARGET**. The
    clicker's windows hide and the screen freezes; drag a snug box around one target. Choose Left
-   or Right for that picture. Repeat for each kind of target (a meteorite, a satellite).
+   or Right for that picture. Repeat for each kind of target.
    Each thing in the area is separated from the backdrop and compared with your pictures by its
    mix of colours, so it does not matter which way up a target is or how big it is. On a plain
    backdrop anything that stands out is an object. On a busy one (a painted scene, a planet) the
    clicker learns the scene in the first two seconds and then treats whatever **moves** across it
    as an object. It picks the method itself.
-   If the game draws a marker on one kind of target, such as a red circle around every satellite,
+   If the game draws a marker on one kind of target, such as a coloured ring around each one,
    use **+ ADD A COLOUR** on the marker instead of a picture. Anything carrying that colour gets
    that button, clicked at its centre. This is the most dependable way to tell two kinds apart.
    Snip the whole target with a little of its surround. The picture may come from a different
    screen than the play field (a menu or preview with another background colour): a plain
    surround is recognised and left out. Avoid snipping a target on a surround the same colour as
-   part of it (a satellite with black panels on a black screen), because those parts can't be
+   part of it (a target with black parts on a black screen), because those parts can't be
    told from the surround.
    Snipping inside a busy game works too, and is the best way to capture a target as the game
    really draws it. Select the area first, then press **+ ADD A PICTURE OF A TARGET** while
@@ -181,7 +181,7 @@ watch plays for that long, and the run stops.
   for** to 0, or leave a number there as an upper limit. Choose something that vanishes the moment
   the game ends and that targets don't fly across; the status shows `WAITING FOR MARKER (62%)`, with how alike the spot is right now, until it
   appears.
-- Something flying in front of the marker (a satellite over a score label) does not end the
+- Something flying in front of the marker (a target passing over a score label) does not end the
   watch: while the watch can see its game screen is still there, unchanged and not moving, it
   treats the marker as covered and carries on for up to 3 seconds. When the game really ends,
   the screen changes as well, and the watch stops as quickly as before.
@@ -221,25 +221,26 @@ watch plays for that long, and the run stops.
 
 **Block with a bar** (steer a bar round a circle with two keys)
 
-For "shield" mini games where things fly out from the middle of a circle and you turn a bar round
-it to block them, such as the Radiations game in Galaxy Idle Clicker.
+For "shield" style games where things fly out from the middle of a circle and you turn a bar round
+it to block them.
 
 1. Add **Block with a bar** on the Actions tab.
 2. While the game is on screen, press **SET UP FROM A SNAPSHOT**. The screen is photographed there
    and then, and on that still picture you click the middle of the circle (where things fly out
-   from), then right on the bar, then optionally drag a box round the game's timer label for the
-   start/stop marker (Esc skips it). Take as long as you like: the game can end meanwhile. The bar's
+   from), then right on the bar, then one of each kind of thing to block (most valuable first,
+   Enter when done), then optionally drag a box round the game's timer label for the start/stop
+   marker (Esc skips it). Take as long as you like: the game can end meanwhile. The bar's
    distance from the centre sets its circle, and the colour under the click is what it is found by.
    (**PICK THE CENTRE** and **PICK THE BAR** do the same on the live screen.)
-4. Set the two **Turn keys** (A and D by default). At the start of every run it holds the clockwise
+3. Set the two **Turn keys** (A and D by default). At the start of every run it holds the clockwise
    key for a fifth of a second and watches the bar, to learn which way each key really turns it,
    how fast, and how far behind the game the screen picture is.
-5. List the colours of the things to block, most valuable first: when there is time to reach only
-   one, it goes for the one highest in the list. **USE THE RADIATION COLOURS** fills in the four
-   kinds of radiation (green, purple, yellow, cyan).
-6. **TEST ON THE SCREEN NOW** watches for three seconds and says whether it can see the bar and what
+4. The things to block are listed by colour, most valuable first: when there is time to reach only
+   one, it goes for the one highest in the list. The snapshot fills the list; **+ ADD A COLOUR** adds
+   more, the arrow moves one up, and each can be given a name.
+5. **TEST ON THE SCREEN NOW** watches for three seconds and says whether it can see the bar and what
    it sees flying out. No keys are pressed.
-7. Optionally **SNIP A START / STOP MARKER**. Steering waits for it, stops the moment it goes, and
+6. Optionally **SNIP A START / STOP MARKER**. Steering waits for it, stops the moment it goes, and
    ends half a second later. Or set **Keep steering for** to the game's length.
 
 While it runs it finds the bar on its circle and the things flying out (they are told apart from the

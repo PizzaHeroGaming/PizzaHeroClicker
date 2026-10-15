@@ -55,8 +55,9 @@ public sealed class DialogService(ScreenService screen) : IDialogService
             int[] frame = [];
             photographed = vw > 0 && vh > 0 && screen.TryCapture(vx, vy, vw, vh, ref frame);
             if (photographed) picks = await FrozenPointPicker.PickAsync(frame, vx, vy, vw, vh,
-                "click the CENTRE of the circle the bar goes round (where things fly out from).",
-                "click right ON THE BAR.");
+                ["click the CENTRE of the circle the bar goes round (where things fly out from).",
+                 "click right ON THE BAR."],
+                "click ONE OF EACH KIND of thing to block, on its most distinctive colour, most valuable first.");
             if (picks is not null)
                 marker = await RegionPickerWindow.SnipFromAsync(frame, vx, vy, vw, vh,
                     "Last, optional: drag a box round something that shows only while the game is on (such as its timer label) to use as the start/stop marker.   Esc skips this.");
@@ -70,7 +71,7 @@ public sealed class DialogService(ScreenService screen) : IDialogService
             Inform(title, "The screen could not be photographed.");
             return null;
         }
-        if (picks is not { Count: 2 }) return null;
+        if (picks is not { Count: >= 2 }) return null;
         if (CoordinateOrigin() is not var (ox, oy))
         {
             Inform(title, "The target window isn't open, so the positions can't be stored relative to it.");
@@ -85,7 +86,8 @@ public sealed class DialogService(ScreenService screen) : IDialogService
             else
                 markerPick = (marker.Region with { X = marker.Region.X - ox, Y = marker.Region.Y - oy }, TemplateImage.Encode(marker.Pixels, w, h));
         }
-        return new BarSnapshotSetup(picks[0] with { X = picks[0].X - ox, Y = picks[0].Y - oy }, picks[1] with { X = picks[1].X - ox, Y = picks[1].Y - oy }, markerPick);
+        PickResult Local(PickResult p) => p with { X = p.X - ox, Y = p.Y - oy };
+        return new BarSnapshotSetup(Local(picks[0]), Local(picks[1]), picks.Skip(2).Select(Local).ToList(), markerPick);
     }
 
     /// <summary>
@@ -143,7 +145,7 @@ public sealed class DialogService(ScreenService screen) : IDialogService
                     var kinds = copy.Targets.Select((t, i) => seen[i] > 0 ? $"{(t.Name.Length > 0 ? t.Name : t.Color)} ({seen[i]} at once)" : null).Where(s => s is not null).ToList();
                     text.AppendLine(kinds.Count > 0
                         ? "Flying out, seen: " + string.Join(", ", kinds) + "."
-                        : "Nothing seen flying out. That is expected if the game was not sending anything during those three seconds; it only notices things once they move.");
+                        : "Nothing seen flying out. That is expected if nothing was flying during those three seconds; it only notices things once they move.");
                 }
                 message = text.ToString();
             }

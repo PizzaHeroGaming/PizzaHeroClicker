@@ -22,6 +22,7 @@ public sealed class FrozenPointPicker : Window
     private readonly TaskCompletionSource<List<PickResult>?> _completion = new();
     private readonly List<PickResult> _picks = new();
     private readonly string[] _prompts;
+    private readonly string? _repeatPrompt; // after the fixed prompts: click as many times as wanted, Enter to finish
     private readonly int[] _frame;
     private readonly (int X, int Y, int Width, int Height) _bounds;
     private readonly Canvas _canvas = new();
@@ -32,11 +33,12 @@ public sealed class FrozenPointPicker : Window
     private IntPtr _hwnd;
     private bool _done;
 
-    private FrozenPointPicker(int[] frame, (int, int, int, int) bounds, BitmapSource still, string[] prompts)
+    private FrozenPointPicker(int[] frame, (int, int, int, int) bounds, BitmapSource still, string[] prompts, string? repeatPrompt)
     {
         _frame = frame;
         _bounds = bounds;
         _prompts = prompts;
+        _repeatPrompt = repeatPrompt;
         WindowStyle = WindowStyle.None;
         Topmost = true;
         ShowInTaskbar = false;
@@ -88,17 +90,23 @@ public sealed class FrozenPointPicker : Window
     /// Shows the given photograph of the desktop and asks for one click per prompt. Completes with
     /// the points (and the colour under each, from the photograph), or null if cancelled.
     /// </summary>
-    public static Task<List<PickResult>?> PickAsync(int[] frame, int left, int top, int width, int height, params string[] prompts)
+    /// <param name="repeatPrompt">If given, after the fixed prompts the user may click any number of further points, pressing Enter to finish.</param>
+    public static Task<List<PickResult>?> PickAsync(int[] frame, int left, int top, int width, int height, string[] prompts, string? repeatPrompt = null)
     {
         var still = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgr32, null, frame, width * 4);
         still.Freeze();
-        var window = new FrozenPointPicker(frame, (left, top, width, height), still, prompts);
+        var window = new FrozenPointPicker(frame, (left, top, width, height), still, prompts, repeatPrompt);
         window.Show();
         return window._completion.Task;
     }
 
-    private void ShowPrompt() =>
-        _hint.Text = $"Step {_picks.Count + 1} of {_prompts.Length}: {_prompts[_picks.Count]}   (this is a still picture; take your time.  Backspace undoes, Esc cancels)";
+    private void ShowPrompt()
+    {
+        int steps = _prompts.Length + (_repeatPrompt is null ? 0 : 1);
+        _hint.Text = _picks.Count < _prompts.Length
+            ? $"Step {_picks.Count + 1} of {steps}: {_prompts[_picks.Count]}   (this is a still picture; take your time.  Backspace undoes, Esc cancels)"
+            : $"Step {steps} of {steps}: {_repeatPrompt}   ({_picks.Count - _prompts.Length} so far.  Enter when done, Backspace undoes, Esc cancels)";
+    }
 
     private void ApplyBounds()
     {
@@ -144,7 +152,7 @@ public sealed class FrozenPointPicker : Window
         _canvas.Children.Add(mark);
         _marks.Add(mark);
 
-        if (_picks.Count == _prompts.Length)
+        if (_picks.Count == _prompts.Length && _repeatPrompt is null)
         {
             _done = true;
             Close();
@@ -156,6 +164,11 @@ public sealed class FrozenPointPicker : Window
     protected override void OnKeyDown(KeyEventArgs e)
     {
         if (e.Key == Key.Escape) Close();
+        if (e.Key == Key.Enter && _repeatPrompt is not null && _picks.Count >= _prompts.Length)
+        {
+            _done = true;
+            Close();
+        }
         if (e.Key == Key.Back && _picks.Count > 0)
         {
             _picks.RemoveAt(_picks.Count - 1);

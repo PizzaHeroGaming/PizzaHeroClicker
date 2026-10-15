@@ -608,7 +608,11 @@ public partial class App : Application
             await Settle();
             SaveSnapshot(window, Path.Combine(dir, "actions-after-moves.png"));
 
-            var bar = new BarBlockAction { CentreX = 1000, CentreY = 650, Radius = 546, Targets = new(BarBlockAction.RadiationDefaults()) };
+            var bar = new BarBlockAction
+            {
+                CentreX = 1000, CentreY = 650, Radius = 546,
+                Targets = { new BlockTarget { Color = "#70F070" }, new BlockTarget { Color = "#F8F86A" }, new BlockTarget { Color = "#FFFFFF" } },
+            };
             foreach (var action in _viewModel.Profile.Actions.Where(a => a is KeyPressAction or PixelClickAction or AreaWatchAction).Append(bar))
             {
                 var editor = new ActionEditorWindow(new ActionEditorViewModel(action.Clone(), "Edit action",

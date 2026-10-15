@@ -10,9 +10,10 @@ public sealed record RegionPick(int X, int Y, int Width, int Height);
 
 /// <summary>
 /// What was picked on one frozen snapshot of a bar-steering game: its centre, a point on the bar
-/// (with the bar's colour), and optionally a start/stop marker. In the profile's coordinates.
+/// (with the bar's colour), one point on each kind of thing to block (most valuable first, with
+/// their colours), and optionally a start/stop marker. In the profile's coordinates.
 /// </summary>
-public sealed record BarSnapshotSetup(PickResult Centre, PickResult Bar, (RegionPick Region, string Image)? Marker);
+public sealed record BarSnapshotSetup(PickResult Centre, PickResult Bar, IReadOnlyList<PickResult> Targets, (RegionPick Region, string Image)? Marker);
 
 /// <summary>Everything the view models need from the UI layer, so they never create windows themselves.</summary>
 public interface IDialogService

@@ -30,7 +30,7 @@ public partial class BlockTarget : ObservableObject
 
 /// <summary>
 /// Steers a bar round a circle with two keys to block things flying outward from its centre
-/// (a "shield" mini game). Each look it finds the bar's angle on its circle and the incoming
+/// (a "shield" style game). Each look it finds the bar's angle on its circle and the incoming
 /// things, picks the one to block (the most valuable it can reach in time, otherwise the one
 /// about to get past), and holds whichever key turns the bar towards it.
 /// Positions use the same coordinates as everything else in the profile.
@@ -114,13 +114,4 @@ public partial class BarBlockAction : ActionBase, IHasMarker
             target.Tolerance = Math.Clamp(target.Tolerance, 0, 255);
         }
     }
-
-    /// <summary>The four kinds of radiation in Galaxy Idle Clicker's Radiations mini game, rarest first.</summary>
-    public static IEnumerable<BlockTarget> RadiationDefaults() =>
-    [
-        new() { Name = "green", Color = "#70F070", Tolerance = 60 },
-        new() { Name = "purple", Color = "#D060F0", Tolerance = 60 },
-        new() { Name = "yellow", Color = "#F8F86A", Tolerance = 45 },
-        new() { Name = "cyan", Color = "#FFFFFF", Tolerance = 30 },
-    ];
 }

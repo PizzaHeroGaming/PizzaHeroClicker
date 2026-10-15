@@ -11,10 +11,19 @@ internal static class ShieldGame
     public const int Radius = 150, Size = 2 * (Radius + BarBlockAction.LookMargin), Centre = Size / 2;
     public const int Yellow = 0xF8F86A, White = 0xFFFFFF, Cyan = 0x62D6FF;
 
+    /// <summary>Four kinds of ball, most valuable first, told apart by the colour of their ring.</summary>
+    public static IEnumerable<BlockTarget> FourKinds() =>
+    [
+        new() { Name = "green", Color = "#70F070", Tolerance = 60 },
+        new() { Name = "purple", Color = "#D060F0", Tolerance = 60 },
+        new() { Name = "yellow", Color = "#F8F86A", Tolerance = 45 },
+        new() { Name = "cyan", Color = "#FFFFFF", Tolerance = 30 },
+    ];
+
     public static BarBlockAction Action() => new()
     {
         CentreX = 500, CentreY = 400, Radius = Radius, PollMs = 10,
-        Targets = new(BarBlockAction.RadiationDefaults()),
+        Targets = new(ShieldGame.FourKinds()),
     };
 
     /// <summary>

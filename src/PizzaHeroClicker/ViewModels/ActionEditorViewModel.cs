@@ -35,6 +35,11 @@ public partial class ActionEditorViewModel : ObservableObject
             bar.Radius = (int)Math.Round(Math.Sqrt(Math.Pow(setup.Bar.X - setup.Centre.X, 2) + Math.Pow(setup.Bar.Y - setup.Centre.Y, 2)));
             bar.BarColor = setup.Bar.Color.ToHex();
             bar.InnerRadius = Math.Min(bar.InnerRadius, Math.Max(0, bar.Radius - 20));
+            if (setup.Targets.Count > 0)
+            {
+                bar.Targets.Clear();
+                foreach (var target in setup.Targets) bar.Targets.Add(new BlockTarget { Color = target.Color.ToHex() });
+            }
             if (setup.Marker is var (region, image))
             {
                 (bar.AnchorX, bar.AnchorY, bar.AnchorWidth, bar.AnchorHeight) = (region.X, region.Y, region.Width, region.Height);
@@ -96,15 +101,6 @@ public partial class ActionEditorViewModel : ObservableObject
         if (Action is not BarBlockAction bar || parameter is not BlockTarget target) return;
         int i = bar.Targets.IndexOf(target);
         if (i > 0) bar.Targets.Move(i, i - 1);
-    }
-
-    /// <summary>Fills in the four kinds of radiation from Galaxy Idle Clicker's Radiations game.</summary>
-    [RelayCommand]
-    private void UseRadiationColours()
-    {
-        if (Action is not BarBlockAction bar) return;
-        bar.Targets.Clear();
-        foreach (var target in BarBlockAction.RadiationDefaults()) bar.Targets.Add(target);
     }
 
     [RelayCommand]
@@ -297,7 +293,7 @@ public partial class ActionEditorViewModel : ObservableObject
             AreaWatchAction a when a.Width < 1 || a.Height < 1 => "Select an area to watch.",
             BarBlockAction { CentreX: 0, CentreY: 0 } => "Pick the centre of the circle the bar travels round.",
             BarBlockAction b when !PixelColor.TryParse(b.BarColor, out _) => "The bar's colour must look like #RRGGBB.",
-            BarBlockAction { Targets.Count: 0 } => "Add at least one colour to block (or use the radiation colours).",
+            BarBlockAction { Targets.Count: 0 } => "Add at least one colour to block: SET UP FROM A SNAPSHOT asks for them, or use + ADD A COLOUR.",
             BarBlockAction b when b.Targets.Any(t => !PixelColor.TryParse(t.Color, out _)) => "Every colour must look like #RRGGBB.",
             BarBlockAction b when b.ClockwiseKey.IsEmpty || b.AnticlockwiseKey.IsEmpty || b.ClockwiseKey == b.AnticlockwiseKey => "Set two different keys for turning the bar.",
             _ => null,
