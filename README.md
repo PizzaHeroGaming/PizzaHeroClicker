@@ -193,6 +193,13 @@ watch plays for that long, and the run stops.
   that is already hit and fading out isn't clicked again; wasted clicks often break a combo. Raise
   it if hit targets linger longer than that. A moving target is also left until it is fully inside
   the area.
+- A spot that was just clicked stays off-limits for as long as something is still sitting there
+  (a destroyed target's explosion, say), so lingering effects don't soak up clicks.
+- Against a busy, moving scene, something that stays in one spot (a combo counter whose digits
+  change with each hit, an animated icon) is part of the game's display, not a target. It is
+  ignored for the rest of the run after being seen standing still for 0.3 s, or after being
+  "found" twice in exactly the same place. The log notes each spot. Even so, keep the game's
+  counters and buttons out of the watched area where you can.
 - Moving targets are clicked where they will be, not where they were (**Moving targets** in the
   action, on by default). It measures how fast each target moves between looks and aims ahead by
   the moment between seeing it and the game receiving the click. Turn it off if clicks start

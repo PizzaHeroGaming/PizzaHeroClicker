@@ -164,6 +164,32 @@ public sealed class AreaDetector
     /// whole screen is taken to mean the game has ended, rather than that it is starting.
     /// </summary>
     public void NotifyClicked() => _hasClicked = true;
+
+    private readonly List<(int X, int Y)> _clickedSpots = new();
+    private const int SameSpotPx = 10;
+
+    /// <summary>
+    /// As <see cref="NotifyClicked()"/>, saying where the target was seen (area pixels, before any
+    /// aiming ahead). Against a moving scene, a second target in the very same spot as an earlier
+    /// one is not a target at all but part of the game's display (a counter that changes with every
+    /// hit): a real one that was missed has moved on by the time it is clicked again.
+    /// </summary>
+    public void NotifyClicked(int x, int y)
+    {
+        _hasClicked = true;
+        if (!_learnedBusy) return;
+        if (_clickedSpots.Any(s => Math.Abs(s.X - x) <= SameSpotPx && Math.Abs(s.Y - y) <= SameSpotPx))
+        {
+            if (!_stillSpots.Any(s => Math.Abs(s.X - x) <= StillSpotRadius && Math.Abs(s.Y - y) <= StillSpotRadius))
+            {
+                _stillSpots.Add((x, y));
+                SpotIgnored?.Invoke(x, y);
+            }
+            return;
+        }
+        if (_clickedSpots.Count >= 500) _clickedSpots.RemoveAt(0);
+        _clickedSpots.Add((x, y));
+    }
     private readonly List<(TemplateMatch Match, int Rule, int Width, int Height)> _exactMatches = new();
     private TargetSignature[] _signatures = [];
     private int _signatureBackground = -1;
@@ -238,6 +264,19 @@ public sealed class AreaDetector
     /// <summary>Everything that could have been the target at the last look (area pixels), for troubleshooting.</summary>
     public IReadOnlyList<(int X, int Y)> LastOffers => _offers;
 
+    // Spots where something stood still while the game scene moved: the game's own display (a
+    // combo counter whose digits change with every hit, an icon that animates). Never clicked.
+    private readonly List<(int X, int Y)> _stillSpots = new();
+    private const double StandingStillMs = 300, StandingStillPx = 8;
+    /// <summary>How close to an ignored spot something must be to be ignored too. Small, so targets passing by still count.</summary>
+    private const int StillSpotRadius = 25;
+
+    /// <summary>Spots ignored because something there stayed put (area pixels), for troubleshooting.</summary>
+    public IReadOnlyList<(int X, int Y)> IgnoredSpots => _stillSpots;
+
+    /// <summary>Raised the first time a spot is ignored, with its position in area pixels.</summary>
+    public event Action<int, int>? SpotIgnored;
+
     /// <param name="nowMs">A millisecond clock for scene learning and following targets; leave out to use the system's.</param>
     /// <param name="avoid">Spots (area pixels) clicked a moment ago; targets within <see cref="AvoidRadius"/> of one are passed over.</param>
     public (int X, int Y, int Rule)? Find(int[] pixels, long nowMs = -1, IReadOnlyList<(int X, int Y)>? avoid = null)
@@ -253,6 +292,10 @@ public sealed class AreaDetector
         (int Key, int X, int Y, int Rule)? best = null;
         void Offer(int x, int y, int rule)
         {
+            foreach (var (sx, sy) in _stillSpots)
+            {
+                if (Math.Abs(x - sx) <= StillSpotRadius && Math.Abs(y - sy) <= StillSpotRadius) return; // part of the game's display
+            }
             _offers.Add((x, y)); // followed from look to look even when passed over below
             if (avoid is not null)
             {
@@ -400,6 +443,17 @@ public sealed class AreaDetector
         (int X, int Y, int Rule)? target = best is var (_, bx, by, brule) ? (bx, by, brule) : null;
         _tracker.Update(_offers, lookMs);
         TargetVelocity = target is var (tx, ty, _) ? _tracker.VelocityOf(tx, ty) : (0, 0);
+        // Against a busy, moving scene the targets are the things that move. Something that stays in
+        // one spot is part of the game's display, and is left alone from now on. (On a plain
+        // backdrop a target that sits still, a button say, is exactly what is wanted.)
+        if (_learnedBusy && !IsScreenChanged)
+        {
+            foreach (var (sx, sy) in _tracker.TakeStandingStill(StandingStillMs, StandingStillPx))
+            {
+                _stillSpots.Add((sx, sy));
+                SpotIgnored?.Invoke(sx, sy);
+            }
+        }
         if (report is not null) report.Target = target;
         return target;
     }
@@ -462,6 +516,9 @@ public sealed class AreaDetector
                 ? $"Busy backdrop: finding things by their movement.  Moving objects seen: {report.ObjectsFound}."
                 : $"Plain backdrop, colour {report.Background}.  Separate objects seen in the area: {report.ObjectsFound}.");
             if (report.Learning) text.AppendLine("Still learning what the scene looks like (takes about two seconds).");
+            if (_stillSpots.Count > 0)
+                text.AppendLine($"Ignoring {_stillSpots.Count} spot{(_stillSpots.Count == 1 ? "" : "s")} where something stayed put while the scene moved (part of the game's display, not a target): "
+                                + string.Join(", ", _stillSpots.Select(s => $"({s.X}, {s.Y})")) + ".");
             if (report.ScreenChanged) text.AppendLine("This is a different screen from the one the watch was playing on, so nothing on it is treated as a target.");
             if (report.TooSmall + report.TooLarge > 0)
                 text.AppendLine($"Ignored for size: {report.TooSmall} too small (under {report.MinPixels:N0} px), {report.TooLarge} too large (over {report.MaxPixels:N0} px; the largest was {report.LargestPixels:N0} px).");

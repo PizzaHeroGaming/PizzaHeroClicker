@@ -85,6 +85,7 @@ public sealed class ClickEngine : IDisposable
     private readonly Dictionary<AreaWatchAction, long> _anchorNextSearch = new();
     private int[] _anchorRegion = [];
     private const int AnchorSearchPx = 40;       // how far from its snipped spot a marker is looked for
+    private const int LingerPx = 15;             // something this close to a just-clicked spot is what was clicked, lingering
     private const double AnchorSearchEveryMs = 400;
     private int[] _anchorPixels = [];
     private const double AnchorCheckMs = 100;   // how often the marker is looked at while there is nothing to click
@@ -652,7 +653,12 @@ public sealed class ClickEngine : IDisposable
     private bool DoAreaWatch(AreaWatchAction a)
     {
         // Decoding pictures and parsing colours happens once per run, not once per pass.
-        if (!_detectors.TryGetValue(a, out var detector)) _detectors[a] = detector = new AreaDetector(a);
+        if (!_detectors.TryGetValue(a, out var detector))
+        {
+            _detectors[a] = detector = new AreaDetector(a);
+            detector.SpotIgnored += (x, y) => Log.Info($"Area watch: ignoring the spot at ({a.X + x}, {a.Y + y}) for the rest of this run. " +
+                                                       "Something there stayed put while the game moved, so it is part of the game's display (a score, an icon), not a target.");
+        }
 
         long TimeoutFromNow() => a.TimeoutMs > 0 ? TimingEngine.Now + TimingEngine.MsToTicks(a.TimeoutMs) : long.MaxValue;
         Interlocked.Exchange(ref _nextDue, 0);
@@ -740,6 +746,23 @@ public sealed class ClickEngine : IDisposable
             foreach (var c in _recentAreaClicks) _avoid.Add((c.X, c.Y));
 
             var found = captured ? detector.Find(_areaPixels, -1, _avoid) : null;
+            // A spot just clicked stays off-limits for as long as something is still sitting right
+            // there: a destroyed target's explosion can outlast "leave that spot alone", and a click
+            // on it is wasted (and may count as a miss). A missed target moves off and is free again.
+            if (captured && _recentAreaClicks.Count > 0)
+            {
+                var offers = detector.LastOffers;
+                for (int i = 0; i < _recentAreaClicks.Count; i++)
+                {
+                    var c = _recentAreaClicks[i];
+                    foreach (var (ox, oy) in offers)
+                    {
+                        if (Math.Abs(ox - c.X) > LingerPx || Math.Abs(oy - c.Y) > LingerPx) continue;
+                        _recentAreaClicks[i] = (c.X, c.Y, TimingEngine.Now);
+                        break;
+                    }
+                }
+            }
             if (captured && _debugFolder is not null && _debugCount < MaxDebugSnapshots && _debugLooks.Length < 400_000)
             {
                 _debugLooks.Append(TimingEngine.TicksToMs(lookedAt - _debugStartedAt).ToString("0", System.Globalization.CultureInfo.InvariantCulture));
@@ -773,7 +796,7 @@ public sealed class ClickEngine : IDisposable
                 if (a.LeadMovingTargets) (x, y) = AimAhead(a, x, y, detector.TargetVelocity, lookedAt);
                 // DoClick takes profile-space coordinates and resolves them itself.
                 if (!DoClick(false, a.X + sx + x, a.Y + sy + y, a.Rules[rule].Button, ClickKind.Single, a.HoldMs, 0)) return false;
-                detector.NotifyClicked();
+                detector.NotifyClicked(seenX, seenY);
                 if (a.RetargetDelayMs > 0) _recentAreaClicks.Add((x, y, TimingEngine.Now));
                 if (_debugFolder is not null && _debugClicks.Length < 20_000)
                 {

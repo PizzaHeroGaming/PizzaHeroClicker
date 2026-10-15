@@ -219,6 +219,41 @@ public class SceneTests
     }
 
     [Fact]
+    public void SomethingThatStaysPutOnABusySceneIsPartOfTheDisplayNotATarget()
+    {
+        // Like a combo counter: it appears (its digits changed) and stays in one spot, nearer the
+        // centre than the rock that is really flying in. It may be clicked once at most; after
+        // that the rock must be the target.
+        var detector = new AreaDetector(Watch());
+        Play(detector, 0, 2000, (_, _) => { });                                  // learn the scene
+        var results = Play(detector, 2100, 3000, (frame, ms) =>
+        {
+            DrawRock(frame, 300, 150);                                           // stays put
+            DrawRock(frame, 40 + (int)((ms - 2100) * 0.15), 330);                // flies in from the left
+        });
+
+        Assert.Contains(detector.IgnoredSpots, s => Math.Abs(s.X - 300) <= 8 && Math.Abs(s.Y - 150) <= 8);
+        var late = results.Where(r => r.Ms >= 2600).ToList();
+        Assert.All(late, r => Assert.True(r.Target is { Y: > 300 }, $"at {r.Ms} ms the target was {r.Target}, not the moving rock"));
+        Assert.Contains("stayed put", detector.DescribeLastReport());
+    }
+
+    [Fact]
+    public void TheSameSpotClickedTwiceOnABusySceneIsLeftAloneAfterwards()
+    {
+        var detector = new AreaDetector(Watch());
+        Play(detector, 0, 2000, (_, _) => { });
+        Play(detector, 2100, 2300, (frame, _) => DrawRock(frame, 200, 100));
+        detector.NotifyClicked(200, 100);
+        detector.NotifyClicked(203, 98);   // a "target" in the very same spot again: a counter, not a rock
+        Assert.Single(detector.IgnoredSpots);
+
+        // A rock passing well clear of that spot is still a target.
+        var results = Play(detector, 2400, 2600, (frame, ms) => DrawRock(frame, 300, 200 + (int)((ms - 2400) * 0.1)));
+        Assert.NotNull(results[^1].Target);
+    }
+
+    [Fact]
     public void NothingIsClickedWhenNothingMoves()
     {
         var detector = new AreaDetector(Watch());

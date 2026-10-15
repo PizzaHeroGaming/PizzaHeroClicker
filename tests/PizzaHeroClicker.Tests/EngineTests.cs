@@ -489,6 +489,43 @@ public class ClickEngineTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void ASpotStaysLeftAloneWhileWhatWasClickedLingersThere()
+    {
+        // A target is clicked and its explosion stays on screen for 1.5 s, much longer than "leave
+        // that spot alone" (400 ms). It must not be clicked again; a new target elsewhere must be.
+        const int W = 200, H = 100;
+        var picture = new int[24 * 24];
+        for (int y = 4; y < 20; y++)
+        for (int x = 4; x < 20; x++)
+            picture[y * 24 + x] = 0xE08020;
+        long start = TimingEngine.Now;
+        _screen.Capture = (_, _, w, h) =>
+        {
+            var frame = new int[w * h];
+            double ms = TimingEngine.TicksToMs(TimingEngine.Now - start);
+            int cx = ms < 1500 ? 50 : ms < 2500 ? 150 : -1;
+            if (cx > 0 && w == W)
+                for (int y = 42; y < 58; y++)
+                for (int x = cx - 8; x < cx + 8; x++)
+                    frame[y * w + x] = 0xE08020;
+            return frame;
+        };
+
+        var profile = Plain(10, 1);
+        profile.Repeat.Mode = RepeatMode.Loops;
+        profile.Actions.Add(new AreaWatchAction
+        {
+            X = 100, Y = 100, Width = W, Height = H, PollMs = 10, RetargetDelayMs = 400, WatchForMs = 2400, LeadMovingTargets = false,
+            Rules = { new AreaRule { Image = TemplateImage.Encode(picture, 24, 24), MatchPercent = 55, Button = ClickButton.Left } },
+        });
+        Assert.Equal(StopReason.Completed, Run(profile).Reason);
+
+        var moves = _input.Snapshot().Where(e => e.Event.StartsWith("move ")).Select(e => e.Event[5..].Split(',').Select(int.Parse).ToArray()).ToList();
+        Assert.Equal(1, moves.Count(m => Math.Abs(m[0] - 150) <= 4));   // the first target: once, not every 400 ms
+        Assert.Equal(1, moves.Count(m => Math.Abs(m[0] - 250) <= 4));   // the new one
+    }
+
+    [Fact]
     public void AMarkerStartsTheWatchWhenItAppearsAndEndsItWhenItGoes()
     {
         // The area always has a target. The marker (a 20 x 10 label at 500, 20) decides when clicking happens.

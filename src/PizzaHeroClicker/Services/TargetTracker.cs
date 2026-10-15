@@ -16,6 +16,10 @@ public sealed class TargetTracker
         public readonly List<(double T, double X, double Y)> Points = new();
         public double VX, VY;       // pixels per second; 0 until there is enough to go on
         public bool Trusted;
+        public double FirstT;       // when it was first seen (its points are trimmed, this is not)
+        public double FirstX, FirstY;
+        public double FarthestPx;   // furthest it has been from where it was first seen
+        public bool ReportedStill;
         public double LastT => Points[^1].T;
         public (double X, double Y) PredictAt(double t)
         {
@@ -75,7 +79,7 @@ public sealed class TargetTracker
         for (int si = 0; si < seen.Count; si++)
         {
             if (seenUsed[si]) continue;
-            var track = new Track();
+            var track = new Track { FirstT = timeMs, FirstX = seen[si].X, FirstY = seen[si].Y };
             track.Points.Add((timeMs, seen[si].X, seen[si].Y));
             _tracks.Add(track);
         }
@@ -97,8 +101,26 @@ public sealed class TargetTracker
 
     public void Clear() => _tracks.Clear();
 
+    /// <summary>
+    /// Things that have been seen in the same spot for at least <paramref name="forMs"/>, moving no
+    /// more than <paramref name="withinPx"/>, each reported once. Against a moving game scene these
+    /// are part of the game's display (a score that keeps changing, an animated icon), not targets.
+    /// </summary>
+    public List<(int X, int Y)> TakeStandingStill(double forMs, double withinPx)
+    {
+        var still = new List<(int X, int Y)>();
+        foreach (var track in _tracks)
+        {
+            if (track.ReportedStill || track.LastT - track.FirstT < forMs || track.FarthestPx > withinPx) continue;
+            track.ReportedStill = true;
+            still.Add(((int)track.FirstX, (int)track.FirstY));
+        }
+        return still;
+    }
+
     private static void Add(Track track, (int X, int Y) p, double timeMs)
     {
+        track.FarthestPx = Math.Max(track.FarthestPx, Math.Sqrt((p.X - track.FirstX) * (p.X - track.FirstX) + (p.Y - track.FirstY) * (p.Y - track.FirstY)));
         track.Points.Add((timeMs, p.X, p.Y));
         track.Points.RemoveAll(q => timeMs - q.T > HistoryMs);
         Fit(track);
