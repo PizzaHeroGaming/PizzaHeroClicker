@@ -325,7 +325,8 @@
                   <TextBox Style="{StaticResource NumBox}" Width="52" Text="{Binding Tolerance, UpdateSourceTrigger=PropertyChanged}" />
                 </StackPanel>
                 <TextBlock Style="{StaticResource Axis}" Text="click with" Margin="12,0,6,0" />
-                <ComboBox ItemsSource="{x:Static models:EnumValues.ClickButtons}" SelectedItem="{Binding Button}" MinWidth="90" />
+                <ComboBox ItemsSource="{x:Static models:AreaRule.ClickChoices}" SelectedItem="{Binding ClickChoice}" MinWidth="110"
+                          ToolTip="Which mouse button to click things like this with. Don't click: leave them alone. Use that for things the game shows that look like targets but are not, such as the smoke an explosion leaves: add a picture of it and set it to Don't click." />
                 <Button Content="✕" Padding="8,2" Margin="10,0,0,0" ToolTip="Remove"
                         Command="{Binding DataContext.RemoveRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                         CommandParameter="{Binding}" />

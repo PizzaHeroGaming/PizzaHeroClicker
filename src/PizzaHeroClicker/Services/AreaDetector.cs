@@ -101,6 +101,8 @@ public sealed class AreaReport
     public List<(int X, int Y, int Pixels, int BestRule, double BestScore)> Objects { get; } = new();
     /// <summary>True when the backdrop is a busy scene and objects are found by their movement.</summary>
     public bool BusyScene;
+    /// <summary>Objects passed over for being as big as a target but empty in the middle (a smoke ring).</summary>
+    public int Hollow;
     /// <summary>True while a busy scene is still being learned (nothing can be recognised yet).</summary>
     public bool Learning;
     /// <summary>True when so much of the area differs from the learned scene that the screen itself must have changed.</summary>
@@ -194,6 +196,9 @@ public sealed class AreaDetector
     private TargetSignature[] _signatures = [];
     private int _signatureBackground = -1;
     private int _minObjectPixels;
+    private int _smallestPicturePixels = int.MaxValue;
+    /// <summary>Below this <see cref="Blob.CentreCover"/> an object counts as empty in the middle.</summary>
+    private const float MaxHollowCover = 0.3f;
     private readonly int _maxObjectPixels;
 
     /// <summary>When true, <see cref="LastReport"/> is filled in by every <see cref="Find"/>.</summary>
@@ -292,6 +297,7 @@ public sealed class AreaDetector
         (int Key, int X, int Y, int Rule)? best = null;
         void Offer(int x, int y, int rule)
         {
+            if (_action.Rules[rule].DontClick) return; // looks most like something to leave alone
             foreach (var (sx, sy) in _stillSpots)
             {
                 if (Math.Abs(x - sx) <= StillSpotRadius && Math.Abs(y - sy) <= StillSpotRadius) return; // part of the game's display
@@ -365,7 +371,7 @@ public sealed class AreaDetector
             if (report is not null) (report.BusyScene, report.Learning, report.ScreenChanged) = (busy, IsLearning, screenChanged);
             var bestSeen = report is null ? null : new double[_appearance.Count];
 
-            int considered = 0;
+            int considered = 0, hollow = 0;
             foreach (var blob in blobs)
             {
                 // A marker such as a ring can sit clear of the thing it surrounds, leaving that thing
@@ -375,6 +381,17 @@ public sealed class AreaDetector
                 // A moving target still crossing the edge of the area is only partly visible: its
                 // centre is not where it seems and it cannot be judged properly. Wait until it is in.
                 if (busy && TouchesEdge(blob, width, height)) continue;
+                // Something as big as a whole target with an empty middle (the ring of smoke an
+                // explosion leaves) cannot be hit by a click at its centre: that click lands on
+                // nothing and counts as a miss. Size matters here: a dark target on a dark backdrop
+                // also looks hollow, but only its bright edges and spots stand out, so it measures
+                // well under the size of its picture. A ring round a satellite is different again:
+                // it is a marker, and the satellite in its middle is what gets clicked.
+                if (blob.Marker < 0 && blob.CentreCover < MaxHollowCover && blob.Pixels >= _smallestPicturePixels)
+                {
+                    hollow++;
+                    continue;
+                }
                 considered++;
 
                 if (blob.Marker >= 0)
@@ -403,6 +420,7 @@ public sealed class AreaDetector
             {
                 report.Background = $"#{background & 0xFFFFFF:X6}";
                 report.ObjectsFound = considered;
+                report.Hollow = hollow;
                 (report.TooSmall, report.TooLarge, report.LargestPixels) = (_blobFinder.LastTooSmall, _blobFinder.LastTooLarge, _blobFinder.LastLargestPixels);
                 (report.MinPixels, report.MaxPixels) = (_minObjectPixels, _maxObjectPixels);
                 for (int i = 0; i < _appearance.Count; i++)
@@ -499,6 +517,7 @@ public sealed class AreaDetector
         // Scale the "too small to be a target" limit to the pictures: a couple of neighbouring stars
         // can otherwise pass for a tiny grey object.
         int smallest = _signatures.Length == 0 ? 0 : _signatures.Min(s => s.Pixels);
+        _smallestPicturePixels = _signatures.Length == 0 ? int.MaxValue : Math.Max(1, smallest);
         _minObjectPixels = Math.Max(_action.MinPixels, (int)(smallest * MinSizeShare));
     }
 
@@ -508,7 +527,7 @@ public sealed class AreaDetector
         if (LastReport is not { } report) return "";
         var text = new StringBuilder();
         var rules = _action.Rules;
-        string Button(int rule) => rules[rule].Button.ToString().ToLowerInvariant();
+        string Button(int rule) => rules[rule].DontClick ? "don't" : rules[rule].Button.ToString().ToLowerInvariant();
 
         if (_appearance.Count > 0)
         {
@@ -516,6 +535,7 @@ public sealed class AreaDetector
                 ? $"Busy backdrop: finding things by their movement.  Moving objects seen: {report.ObjectsFound}."
                 : $"Plain backdrop, colour {report.Background}.  Separate objects seen in the area: {report.ObjectsFound}.");
             if (report.Learning) text.AppendLine("Still learning what the scene looks like (takes about two seconds).");
+            if (report.Hollow > 0) text.AppendLine($"Passed over {report.Hollow} object{(report.Hollow == 1 ? "" : "s")} as big as a target but empty in the middle (a ring of smoke, say): a click there would hit nothing.");
             if (_stillSpots.Count > 0)
                 text.AppendLine($"Ignoring {_stillSpots.Count} spot{(_stillSpots.Count == 1 ? "" : "s")} where something stayed put while the scene moved (part of the game's display, not a target): "
                                 + string.Join(", ", _stillSpots.Select(s => $"({s.X}, {s.Y})")) + ".");

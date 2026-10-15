@@ -286,7 +286,42 @@ public partial class AreaRule : ObservableObject
     /// <summary>Allowed difference per colour channel (0-255).</summary>
     [ObservableProperty] private int _tolerance = 25;
 
-    [ObservableProperty] private ClickButton _button = ClickButton.Left;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ClickChoice))]
+    private ClickButton _button = ClickButton.Left;
+
+    /// <summary>
+    /// Something that looks like this is NOT clicked. For things a game shows that resemble its
+    /// targets (the smoke an explosion leaves, a decoy): a picture of it here wins the comparison
+    /// for those, so no clicking picture claims them.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ClickChoice))]
+    private bool _dontClick;
+
+    public const string DontClickChoice = "Don't click";
+
+    /// <summary>The editor's "click with" choices: the mouse buttons, then "Don't click".</summary>
+    public static string[] ClickChoices { get; } = [.. Enum.GetNames<ClickButton>(), DontClickChoice];
+
+    /// <summary>The editor's view of <see cref="Button"/> and <see cref="DontClick"/> together.</summary>
+    [JsonIgnore]
+    public string ClickChoice
+    {
+        get => DontClick ? DontClickChoice : Button.ToString();
+        set
+        {
+            if (value == DontClickChoice)
+            {
+                DontClick = true;
+            }
+            else if (Enum.TryParse<ClickButton>(value, out var button))
+            {
+                DontClick = false;
+                Button = button;
+            }
+        }
+    }
 
     public bool IsImage => !string.IsNullOrEmpty(Image);
 }

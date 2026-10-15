@@ -17,6 +17,12 @@ public sealed class Blob
     public int Marker = -1;
     /// <summary>Bounding box, in area pixels.</summary>
     public int Left, Top, Right, Bottom;
+    /// <summary>
+    /// How much of a small patch round its centre the object itself covers (0..1). Low for a ring of
+    /// smoke, whose middle is empty, but also for a dark target on a dark backdrop, of which only the
+    /// bright edges and spots stand out; so it is only trusted together with the object's size.
+    /// </summary>
+    public float CentreCover = 1;
     public float[] Histogram = new float[BlobFinder.Bins];
 }
 
@@ -46,6 +52,8 @@ public sealed class BlobFinder
     /// that match the backdrop leave gaps; without this a satellite on black would be three objects.
     /// </summary>
     public const int LinkReach = 3;
+    /// <summary>The patch round an object's centre checked for <see cref="Blob.CentreCover"/>: this many grid cells each way.</summary>
+    public const int CentreReach = 2;
 
     /// <summary>
     /// Optional marker colours. An object containing at least <see cref="MarkerMinPixels"/> of one
@@ -279,12 +287,19 @@ public sealed class BlobFinder
             if (size < minPixels) { LastTooSmall++; continue; }  // a speck
             if (size > maxPixels) { LastTooLarge++; continue; }  // something huge, like a planet
 
+            int centreX = (int)(sumX / tail), centreY = (int)(sumY / tail), covered = 0;
+            for (int i = 0; i < tail; i++)
+            {
+                int cell = _queue[i];
+                if (Math.Abs(cell % gw - centreX) <= CentreReach && Math.Abs(cell / gw - centreY) <= CentreReach) covered++;
+            }
             var blob = new Blob
             {
                 X = (int)(sumX * Step / tail) + Step / 2,
                 Y = (int)(sumY * Step / tail) + Step / 2,
                 Pixels = size,
                 Left = minX * Step, Top = minY * Step, Right = maxX * Step + Step - 1, Bottom = maxY * Step + Step - 1,
+                CentreCover = (float)covered / ((2 * CentreReach + 1) * (2 * CentreReach + 1)),
             };
             int markerCount = Markers?.Count ?? 0;
             if (_markerCounts.Length < markerCount) _markerCounts = new int[markerCount];

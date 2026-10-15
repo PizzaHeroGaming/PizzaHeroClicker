@@ -254,6 +254,39 @@ public class SceneTests
     }
 
     [Fact]
+    public void ARingAsBigAsATargetWithAnEmptyMiddleIsNotClicked()
+    {
+        // The ring of smoke an explosion leaves: rock-coloured, drifting, as big as a rock or bigger,
+        // and nothing in the middle where a click would land. A rock beside it is still the target.
+        var detector = new AreaDetector(Watch());
+        Play(detector, 0, 2000, (_, _) => { });
+        var results = Play(detector, 2100, 3000, (frame, ms) =>
+        {
+            int drift = (int)((ms - 2100) * 0.05);
+            Disc(frame, 300 + drift, 200, 32, Rock, 22);              // the smoke ring, right in the centre
+            DrawRock(frame, 80 + (int)((ms - 2100) * 0.1), 330);      // a rock flying in, further out
+        });
+        Assert.Contains(results, r => r.Report.Hollow > 0);
+        Assert.All(results.Where(r => r.Target is not null), r => Assert.True(r.Target!.Value.Y > 300, $"clicked the ring at {r.Target}"));
+        Assert.Contains("empty in the middle", detector.DescribeLastReport());
+    }
+
+    [Fact]
+    public void APictureSetToDontClickKeepsThingsLikeItFromBeingClicked()
+    {
+        var watch = Watch();
+        watch.Rules[1].DontClick = true; // "rocks": leave them alone
+        Assert.Equal(AreaRule.DontClickChoice, watch.Rules[1].ClickChoice);
+        var detector = new AreaDetector(watch);
+        var results = Play(detector, 0, 4000, (frame, ms) => DrawRock(frame, 40 + (int)(ms * 0.12), 200));
+        Assert.All(results, r => Assert.Null(r.Target));
+
+        watch.Rules[1].ClickChoice = "Left";
+        Assert.False(watch.Rules[1].DontClick);
+        Assert.Equal(ClickButton.Left, watch.Rules[1].Button);
+    }
+
+    [Fact]
     public void NothingIsClickedWhenNothingMoves()
     {
         var detector = new AreaDetector(Watch());

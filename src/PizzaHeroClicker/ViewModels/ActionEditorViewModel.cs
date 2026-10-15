@@ -198,6 +198,7 @@ public partial class ActionEditorViewModel : ObservableObject
             KeyPressAction { Keys.Count: 0 } => "Add at least one key.",
             PixelActionBase p when !PixelColor.TryParse(p.Color, out _) => "The colour must look like #RRGGBB.",
             AreaWatchAction { Rules.Count: 0 } => "Add at least one picture or colour to look for.",
+            AreaWatchAction a when a.Rules.All(r => r.DontClick) => "Every picture and colour is set to Don't click, so nothing would ever be clicked.",
             AreaWatchAction a when a.Rules.Any(r => !r.IsImage && !PixelColor.TryParse(r.Color, out _)) => "Every colour must look like #RRGGBB.",
             AreaWatchAction a when a.Width < 1 || a.Height < 1 => "Select an area to watch.",
             _ => null,

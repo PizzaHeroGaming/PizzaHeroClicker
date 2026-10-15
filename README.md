@@ -200,6 +200,11 @@ watch plays for that long, and the run stops.
   ignored for the rest of the run after being seen standing still for 0.3 s, or after being
   "found" twice in exactly the same place. The log notes each spot. Even so, keep the game's
   counters and buttons out of the watched area where you can.
+- Something as big as a target but empty in the middle (the ring of smoke an explosion leaves) is
+  not clicked: a click at its centre would land on nothing.
+- A picture or colour can be set to **Don't click** (in its "click with" list). Things that look
+  more like that picture than like any target are left alone: useful for things a game shows that
+  resemble its targets.
 - Moving targets are clicked where they will be, not where they were (**Moving targets** in the
   action, on by default). It measures how fast each target moves between looks and aims ahead by
   the moment between seeing it and the game receiving the click. Turn it off if clicks start
