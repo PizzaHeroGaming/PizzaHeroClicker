@@ -107,6 +107,8 @@ public sealed class AreaReport
     public bool Learning;
     /// <summary>True when so much of the area differs from the learned scene that the screen itself must have changed.</summary>
     public bool ScreenChanged;
+    /// <summary>True when much of the area changed since the previous look: the whole picture is moving (a zoom, a transition).</summary>
+    public bool ScreenMoving;
     public int TooSmall, TooLarge, LargestPixels, MinPixels, MaxPixels;
 }
 
@@ -153,6 +155,39 @@ public sealed class AreaDetector
 
     /// <summary>True while a busy scene is still being learned; the caller should keep feeding frames.</summary>
     public bool IsLearning { get; private set; }
+
+    // A coarse copy of the previous look, to tell when the whole picture is moving.
+    private int[] _previousLook = [];
+    private double _previousLookMs = double.NaN;
+    private const int MotionStep = 6;
+    private const double ScreenMovingShare = 0.25;
+
+    /// <summary>
+    /// True if more than <see cref="ScreenMovingShare"/> of the area changed since the previous look
+    /// (taken no more than a quarter of a second ago).
+    /// </summary>
+    private bool ScreenMoving(int[] pixels, int width, int height, double lookMs)
+    {
+        int gw = width / MotionStep, gh = height / MotionStep, cells = gw * gh;
+        if (cells == 0) return false;
+        bool comparable = _previousLook.Length == cells && lookMs - _previousLookMs is > 0 and <= 250;
+        if (_previousLook.Length != cells) _previousLook = new int[cells];
+        int changed = 0;
+        for (int gy = 0; gy < gh; gy++)
+        {
+            int row = gy * MotionStep * width, m = gy * gw;
+            for (int gx = 0; gx < gw; gx++)
+            {
+                int now = pixels[row + gx * MotionStep], before = _previousLook[m + gx];
+                if (comparable && (Math.Abs(((now >> 16) & 0xFF) - ((before >> 16) & 0xFF)) > 40
+                                   || Math.Abs(((now >> 8) & 0xFF) - ((before >> 8) & 0xFF)) > 40
+                                   || Math.Abs((now & 0xFF) - (before & 0xFF)) > 40)) changed++;
+                _previousLook[m + gx] = now;
+            }
+        }
+        _previousLookMs = lookMs;
+        return comparable && changed > cells * ScreenMovingShare;
+    }
 
     /// <summary>True when the last frame showed a different screen from the one learned, so nothing was offered.</summary>
     public bool IsScreenChanged { get; private set; }
@@ -345,6 +380,14 @@ public sealed class AreaDetector
             // however much of it changed. (A small area around one large target loses a third of
             // its content every time that target is clicked away; that is not a new screen.)
             if (screenChanged && !busy && !_learnedBusy && BlobFinder.IsBackground(background, _learnedBackground)) screenChanged = false;
+            // And never while the whole picture is on the move. During play only the targets move,
+            // a few percent of the area from one look to the next; a game ending with a zoom or a
+            // camera sweep changes much more than that at once, and it can do so gradually enough
+            // to stay under the "different screen" test above for a frame or two. A click in those
+            // frames is acted on by the game a frame later, by which time a shop may be showing.
+            bool moving = ScreenMoving(pixels, width, height, lookMs) && (busy || _learnedBusy);
+            if (report is not null) report.ScreenMoving = moving;
+            screenChanged |= moving;
             if (screenChanged)
             {
                 // Before anything has been clicked, a new screen is the game OPENING: learn it at once.
@@ -539,7 +582,8 @@ public sealed class AreaDetector
             if (_stillSpots.Count > 0)
                 text.AppendLine($"Ignoring {_stillSpots.Count} spot{(_stillSpots.Count == 1 ? "" : "s")} where something stayed put while the scene moved (part of the game's display, not a target): "
                                 + string.Join(", ", _stillSpots.Select(s => $"({s.X}, {s.Y})")) + ".");
-            if (report.ScreenChanged) text.AppendLine("This is a different screen from the one the watch was playing on, so nothing on it is treated as a target.");
+            if (report.ScreenMoving) text.AppendLine("The whole picture is moving (a zoom or a transition), so nothing is clicked until it settles.");
+            else if (report.ScreenChanged) text.AppendLine("This is a different screen from the one the watch was playing on, so nothing on it is treated as a target.");
             if (report.TooSmall + report.TooLarge > 0)
                 text.AppendLine($"Ignored for size: {report.TooSmall} too small (under {report.MinPixels:N0} px), {report.TooLarge} too large (over {report.MaxPixels:N0} px; the largest was {report.LargestPixels:N0} px).");
             foreach (var (objectX, objectY, pixels, bestRule, bestScore) in report.Objects.Take(25))

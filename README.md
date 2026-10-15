@@ -185,6 +185,10 @@ watch plays for that long, and the run stops.
   40 px from its spot. When it is found there, the watched area moves by the same amount for that
   run, and the log says how far it was off. For a window that moves a lot, turn on
   **Positions are relative to the window** on the Window tab, or snip the marker again.
+- On a busy, moving scene, nothing is clicked while the whole picture is on the move (more than a
+  quarter of the area changed since the previous look, about 40 ms earlier): a game that ends with
+  a zoom or a camera sweep can open its next screen a moment later, and a click is acted on by the
+  game a frame after it is sent.
 - As a second safeguard, once a watch has clicked something it never clicks on a different screen.
   If a quarter or more of the area suddenly changes (the game closed, a shop opened) it holds off,
   the status shows `DIFFERENT SCREEN`, and it only carries on if the game screen comes back. A

@@ -1103,6 +1103,23 @@ public sealed class ClickEngine : IDisposable
     {
         if (_debugFolder is not { } folder || _debugCount == 0) return;
         SaveSurroundings(a, folder, "surroundings-end.png");
+        // Clicks made after the last saved frame are otherwise never written down.
+        if (_debugClicks.Length > 0)
+        {
+            string tail = $"{Environment.NewLine}Clicks after the last frame, up to the end of the watch:{Environment.NewLine}{_debugClicks}";
+            _debugClicks.Clear();
+            Task.Run(() =>
+            {
+                try
+                {
+                    lock (DebugFileLock) File.AppendAllText(Path.Combine(folder, "report.txt"), tail);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Could not write the last clicks to the report", ex);
+                }
+            });
+        }
         int run = _debugRun;
         Task.Run(async () =>
         {

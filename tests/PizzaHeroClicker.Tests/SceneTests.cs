@@ -287,6 +287,42 @@ public class SceneTests
     }
 
     [Fact]
+    public void NothingIsClickedWhileTheWholePictureIsMoving()
+    {
+        // The game ends with the view sliding away (a zoom or pan): every look, the whole detailed
+        // scene has moved a few pixels. A rock is still flying across it, and must not be clicked.
+        static int[] Textured(int dx)
+        {
+            var pixels = new int[W * H];
+            for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+                pixels[y * W + x] = ((x + dx) / 12 + y / 12) % 2 == 0 ? 0x182838 : 0x707890;
+            return pixels;
+        }
+        var detector = new AreaDetector(Watch()) { CollectReport = true };
+        (int X, int Y, int Rule)? last = null;
+        for (long ms = 0; ms <= 3000; ms += 100)
+        {
+            var frame = Textured(0);
+            DrawRock(frame, 60 + (int)(ms * 0.1), 320);
+            last = detector.Find(frame, ms);
+            Assert.False(detector.LastReport!.ScreenMoving, $"a still scene was taken for a moving one at {ms} ms");
+        }
+        Assert.NotNull(last);                 // the rock is a target while the scene holds still
+        detector.NotifyClicked();
+
+        bool sawMoving = false;
+        for (int step = 1; step <= 6; step++)
+        {
+            var frame = Textured(step * 8);
+            DrawRock(frame, 360 + step * 10, 320);
+            Assert.Null(detector.Find(frame, 3000 + step * 100L));
+            sawMoving |= detector.LastReport!.ScreenMoving;
+        }
+        Assert.True(sawMoving, "the moving picture was never noticed as such");
+    }
+
+    [Fact]
     public void NothingIsClickedWhenNothingMoves()
     {
         var detector = new AreaDetector(Watch());
