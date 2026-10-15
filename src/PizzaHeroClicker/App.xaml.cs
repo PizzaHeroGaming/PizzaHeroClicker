@@ -608,7 +608,8 @@ public partial class App : Application
             await Settle();
             SaveSnapshot(window, Path.Combine(dir, "actions-after-moves.png"));
 
-            foreach (var action in _viewModel.Profile.Actions.Where(a => a is KeyPressAction or PixelClickAction or AreaWatchAction))
+            var bar = new BarBlockAction { CentreX = 1000, CentreY = 650, Radius = 546, Targets = new(BarBlockAction.RadiationDefaults()) };
+            foreach (var action in _viewModel.Profile.Actions.Where(a => a is KeyPressAction or PixelClickAction or AreaWatchAction).Append(bar))
             {
                 var editor = new ActionEditorWindow(new ActionEditorViewModel(action.Clone(), "Edit action",
                     () => Task.FromResult<PickResult?>(null), () => Task.FromResult<RegionPick?>(null), _ => Task.FromResult<string?>(null), _ => Task.CompletedTask,

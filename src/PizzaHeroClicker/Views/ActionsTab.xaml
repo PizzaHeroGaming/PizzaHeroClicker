@@ -27,6 +27,7 @@
             <MenuItem Header="Pixel wait (wait for a colour)" Command="{Binding AddActionCommand}" CommandParameter="pixelWait" />
             <MenuItem Header="Pixel click (click when a colour appears)" Command="{Binding AddActionCommand}" CommandParameter="pixelClick" />
             <MenuItem Header="Area watch (click things that appear in an area, by colour)" Command="{Binding AddActionCommand}" CommandParameter="areaWatch" />
+            <MenuItem Header="Block with a bar (steer a bar round a circle with two keys)" Command="{Binding AddActionCommand}" CommandParameter="barBlock" />
           </ContextMenu>
         </Button.ContextMenu>
       </Button>

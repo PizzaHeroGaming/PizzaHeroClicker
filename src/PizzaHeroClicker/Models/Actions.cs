@@ -19,6 +19,7 @@ namespace PizzaHeroClicker.Models;
 [JsonDerivedType(typeof(PixelWaitAction), "pixelWait")]
 [JsonDerivedType(typeof(PixelClickAction), "pixelClick")]
 [JsonDerivedType(typeof(AreaWatchAction), "areaWatch")]
+[JsonDerivedType(typeof(BarBlockAction), "barBlock")]
 public abstract partial class ActionBase : ObservableObject
 {
     [ObservableProperty] private string _label = "";
@@ -334,7 +335,7 @@ public partial class AreaRule : ObservableObject
 /// put and keeps clicking targets for that long, which suits "do some set-up clicks once, then
 /// play for 30 seconds".
 /// </summary>
-public partial class AreaWatchAction : ActionBase
+public partial class AreaWatchAction : ActionBase, IHasMarker
 {
     [ObservableProperty] private int _x;
     [ObservableProperty] private int _y;

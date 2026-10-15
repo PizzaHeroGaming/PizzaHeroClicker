@@ -47,7 +47,8 @@ public static class ProfileInspector
         // ---- keys: the part that can do real harm
         var keyActions = actions.OfType<KeyPressAction>().Where(a => a.Keys.Count > 0).ToList();
         var keys = keyActions.SelectMany(a => a.Keys).Where(k => !k.IsEmpty).ToList();
-        review.KeyActions = keyActions.Count;
+        var steering = actions.OfType<BarBlockAction>().ToList();
+        review.KeyActions = keyActions.Count + steering.Count;
 
         var winKeys = keys.Where(k => k.Mods.HasFlag(KeyMods.Win) || k.Vk is VkLWin or VkRWin).Select(k => k.Display).Distinct().ToList();
         if (winKeys.Count > 0)
@@ -66,6 +67,15 @@ public static class ProfileInspector
                 + (suspicious ? " Typing a line and entering it is how a profile would run a command. Check that this is something the game expects." : "")));
         }
 
+        foreach (var bar in steering)
+        {
+            var steerKeys = new[] { bar.ClockwiseKey, bar.AnticlockwiseKey }.Where(k => !k.IsEmpty).ToList();
+            if (steerKeys.Any(k => k.Mods.HasFlag(KeyMods.Win) || k.Vk is VkLWin or VkRWin || IsWindowShortcut(k)))
+                notes.Add(new(ReviewLevel.Danger, $"Steers a bar with {string.Join(" and ", steerKeys.Select(k => k.Display))}, holding them down. A game's controls are never the Windows key or a window shortcut."));
+            else
+                notes.Add(new(ReviewLevel.Caution, $"Steers a bar by holding {string.Join(" and ", steerKeys.Select(k => k.Display))} down, many times a second, while it runs. They go to whichever window is in front."));
+        }
+
         if (keys.Count > 0)
         {
             string listed = string.Join(", ", keys.Take(MaxKeysListed).Select(k => k.Display));
@@ -79,7 +89,7 @@ public static class ProfileInspector
         else
             notes.Add(new(ReviewLevel.Caution, "Not locked to a game window: it clicks" + (keys.Count > 0 ? " and types" : "") + " on whatever is on screen when it runs. Have only the game in front."));
 
-        bool positioned = actions.Any(a => a is ClickAction { UseCursor: false } or Models.DragAction or MoveAction or PixelActionBase or AreaWatchAction or ScrollAction { UseCursor: false });
+        bool positioned = actions.Any(a => a is ClickAction { UseCursor: false } or Models.DragAction or MoveAction or PixelActionBase or AreaWatchAction or BarBlockAction or ScrollAction { UseCursor: false });
         if (positioned && !(profile.Window.Enabled && profile.Window.RelativeCoordinates))
             notes.Add(new(ReviewLevel.Info, "Uses fixed screen positions from the author's screen. With a different resolution or window position it can click the wrong things, so try it first where a stray click does no harm."));
 
@@ -99,7 +109,7 @@ public static class ProfileInspector
     public static int TurnKeyPressesOff(Profile profile)
     {
         int count = 0;
-        foreach (var action in profile.Actions.OfType<KeyPressAction>().Where(a => a.Enabled))
+        foreach (var action in profile.Actions.Where(a => a is KeyPressAction or BarBlockAction && a.Enabled))
         {
             action.Enabled = false;
             count++;

@@ -219,6 +219,32 @@ watch plays for that long, and the run stops.
   landing in front of targets.
 - The game must be in windowed or borderless mode; exclusive fullscreen usually can't be read.
 
+**Block with a bar** (steer a bar round a circle with two keys)
+
+For "shield" mini games where things fly out from the middle of a circle and you turn a bar round
+it to block them, such as the Radiations game in Galaxy Idle Clicker.
+
+1. With the game showing, add **Block with a bar** on the Actions tab.
+2. **PICK THE CENTRE**: click the middle of the circle, where things fly out from.
+3. **PICK THE BAR**: click right on the bar. Its distance from the centre sets the circle, and the
+   colour under the click is what the bar is found by.
+4. Set the two **Turn keys** (A and D by default). At the start of every run it holds the clockwise
+   key for a fifth of a second and watches the bar, to learn which way each key really turns it,
+   how fast, and how far behind the game the screen picture is.
+5. List the colours of the things to block, most valuable first: when there is time to reach only
+   one, it goes for the one highest in the list. **USE THE RADIATION COLOURS** fills in the four
+   kinds of radiation (green, purple, yellow, cyan).
+6. **TEST ON THE SCREEN NOW** watches for three seconds and says whether it can see the bar and what
+   it sees flying out. No keys are pressed.
+7. Optionally **SNIP A START / STOP MARKER**. Steering waits for it, stops the moment it goes, and
+   ends half a second later. Or set **Keep steering for** to the game's length.
+
+While it runs it finds the bar on its circle and the things flying out (they are told apart from the
+busy backdrop by their movement, then by their colour), holds whichever key turns the bar towards
+the one to block, and lets go when it is lined up; close to the target it taps the key for exactly
+the time the remaining turn takes. Keys are released when it pauses, stops or loses the game window.
+The first two seconds are spent learning the backdrop.
+
 **Profiles and saving**
 
 - A profile holds everything: actions, intervals, hotkeys, target window and overlays.

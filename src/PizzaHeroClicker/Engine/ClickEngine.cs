@@ -78,11 +78,12 @@ public sealed class ClickEngine : IDisposable
     private bool _ownCheckResult;
     private int[] _areaPixels = [];
     private readonly Dictionary<AreaWatchAction, AreaDetector> _detectors = new(); // engine thread only; rebuilt each run
-    private readonly Dictionary<AreaWatchAction, int[]?> _anchors = new();           // decoded start/stop markers
+    private readonly Dictionary<BarBlockAction, BarBlockDetector> _barDetectors = new();
+    private readonly Dictionary<IHasMarker, int[]?> _anchors = new();           // decoded start/stop markers
     // How far each marker was found from where it was snipped: the game window has moved by that
     // much, so the area it belongs to is moved with it. Found by searching around the snipped spot.
-    private readonly Dictionary<AreaWatchAction, (int X, int Y)> _anchorShift = new();
-    private readonly Dictionary<AreaWatchAction, long> _anchorNextSearch = new();
+    private readonly Dictionary<IHasMarker, (int X, int Y)> _anchorShift = new();
+    private readonly Dictionary<IHasMarker, long> _anchorNextSearch = new();
     private int[] _anchorRegion = [];
     private const int AnchorSearchPx = 40;       // how far from its snipped spot a marker is looked for
     private const int LingerPx = 15;             // something this close to a just-clicked spot is what was clicked, lingering
@@ -221,6 +222,7 @@ public sealed class ClickEngine : IDisposable
             _overOwnWindow = false;
             _ownCheckPoint = (int.MinValue, int.MinValue);
             _detectors.Clear();
+            _barDetectors.Clear();
             _anchors.Clear();
             _anchorShift.Clear();
             _anchorNextSearch.Clear();
@@ -369,6 +371,7 @@ public sealed class ClickEngine : IDisposable
 
         // Entering a blocked state: let go of anything held so nothing stays pressed in the game.
         _input.ReleaseAll();
+        _releasedAll++;
         var resumeState = _state;
         long blockedAt = TimingEngine.Now;
         SetState(blockState);
@@ -479,6 +482,7 @@ public sealed class ClickEngine : IDisposable
         PixelClickAction a => DoPixelClick(a),
         PixelWaitAction a => WaitForPixel(a, out _),
         AreaWatchAction a => DoAreaWatch(a),
+        BarBlockAction a => DoBarBlock(a),
         _ => true,
     };
 
@@ -673,42 +677,16 @@ public sealed class ClickEngine : IDisposable
         int[]? anchor = GetAnchor(a);
         if (anchor is not null)
         {
-            long appearBy = TimeoutFromNow();
-            _waitingForMarker = true;
-            long waitStarted = TimingEngine.Now, nextLog = waitStarted + TimingEngine.MsToTicks(10_000);
-            int best = 0;
-            try
+            switch (WaitForMarker(a, anchor, TimeoutFromNow(), a.PollMs))
             {
-                while (!AnchorShowing(a, anchor))
-                {
-                    best = Math.Max(best, _markerMatch);
-                    if (TimingEngine.Now >= nextLog)
-                    {
-                        // Visible in the log without the recorder: a marker that never comes is the
-                        // usual reason a watch "does nothing", and the number says how far off it is.
-                        nextLog = TimingEngine.Now + TimingEngine.MsToTicks(10_000);
-                        Log.Info($"Still waiting for the start/stop marker after {TimingEngine.TicksToMs(TimingEngine.Now - waitStarted) / 1000:0} s: " +
-                                 $"{_markerMatch}% alike now, best {best}%, needs {a.AnchorMatchPercent}%.");
-                    }
-                    if (_debugFolder is not null) SaveMarkerSnapshot(a);
-                    if (TimingEngine.Now >= appearBy)
-                    {
-                        if (a.OnTimeout == PixelTimeoutBehavior.Stop)
-                        {
-                            Stop(StopReason.PixelTimeout);
-                            return false;
-                        }
-                        _t = TimingEngine.Now;
-                        return true;
-                    }
+                case MarkerWait.Stopped:
+                    return false;
+                case MarkerWait.TimedOut when a.OnTimeout == PixelTimeoutBehavior.Stop:
+                    Stop(StopReason.PixelTimeout);
+                    return false;
+                case MarkerWait.TimedOut:
                     _t = TimingEngine.Now;
-                    if (!Advance(Math.Max(a.PollMs, 50), scaled: false)) return false;
-                    if (!Housekeeping()) return false;
-                }
-            }
-            finally
-            {
-                _waitingForMarker = false;
+                    return true;
             }
         }
         long anchorLastSeen = TimingEngine.Now, anchorNextCheck = 0;
@@ -891,8 +869,256 @@ public sealed class ClickEngine : IDisposable
         return (Math.Clamp(x + (int)Math.Round(dx), 0, a.Width - 1), Math.Clamp(y + (int)Math.Round(dy), 0, a.Height - 1));
     }
 
+    private enum MarkerWait { Appeared, TimedOut, Stopped }
+
+    /// <summary>Waits for a start/stop marker to appear (status: WAITING FOR MARKER).</summary>
+    private MarkerWait WaitForMarker(IHasMarker a, int[] anchor, long appearBy, int pollMs)
+    {
+        _waitingForMarker = true;
+        long waitStarted = TimingEngine.Now, nextLog = waitStarted + TimingEngine.MsToTicks(10_000);
+        int best = 0;
+        try
+        {
+            while (!AnchorShowing(a, anchor))
+            {
+                best = Math.Max(best, _markerMatch);
+                if (TimingEngine.Now >= nextLog)
+                {
+                    // Visible in the log without the recorder: a marker that never comes is the
+                    // usual reason a watch "does nothing", and the number says how far off it is.
+                    nextLog = TimingEngine.Now + TimingEngine.MsToTicks(10_000);
+                    Log.Info($"Still waiting for the start/stop marker after {TimingEngine.TicksToMs(TimingEngine.Now - waitStarted) / 1000:0} s: " +
+                             $"{_markerMatch}% alike now, best {best}%, needs {a.AnchorMatchPercent}%.");
+                }
+                if (_debugFolder is not null) SaveMarkerSnapshot(a);
+                if (TimingEngine.Now >= appearBy) return MarkerWait.TimedOut;
+                _t = TimingEngine.Now;
+                if (!Advance(Math.Max(pollMs, 50), scaled: false)) return MarkerWait.Stopped;
+                if (!Housekeeping()) return MarkerWait.Stopped;
+            }
+            return MarkerWait.Appeared;
+        }
+        finally
+        {
+            _waitingForMarker = false;
+        }
+    }
+
+    // ------------------------------------------------------------------ steering a bar to block things
+
+    private int _releasedAll; // counts the times Housekeeping let go of every key, so a holder knows its key is up
+
+    /// <summary>
+    /// Steers a bar round its circle to block what flies out from the centre (see <see cref="BarBlockAction"/>).
+    /// Holds one of two keys at a time and lets go whenever it is lined up, unsure, or not allowed to act.
+    /// </summary>
+    private bool DoBarBlock(BarBlockAction a)
+    {
+        if (!_barDetectors.TryGetValue(a, out var detector)) _barDetectors[a] = detector = new BarBlockDetector(a);
+        Interlocked.Exchange(ref _nextDue, 0);
+
+        int[]? anchor = GetAnchor(a);
+        if (anchor is not null && WaitForMarker(a, anchor, long.MaxValue, a.PollMs) != MarkerWait.Appeared) return false;
+
+        long started = TimingEngine.Now, anchorLastSeen = started;
+        long watchUntil = a.WatchForMs > 0 ? started + TimingEngine.MsToTicks(a.WatchForMs) : 0;
+        var (bx, by, size) = a.LookBox;
+        int[] pixels = [];
+
+        // What the action learns about the game at the start: which key turns the bar which way,
+        // how fast, and how far behind the game the captured picture is.
+        bool calibrated = false;
+        double degreesPerSecond = 180, pictureLagMs = 30;
+        KeyCombo increaseKey = a.ClockwiseKey, decreaseKey = a.AnticlockwiseKey; // screen angles grow clockwise
+        double loopMs = a.PollMs;   // how long one look-and-decide takes, on average
+        long previousLook = 0;
+
+        // Every key press made, so the turning the picture does not show yet can be added on.
+        var presses = new List<(long Down, long Up, int Way)>();
+        KeyCombo? held = null;
+        int heldWay = 0, releases = _releasedAll;
+
+        // +1 = hold the key that grows the angle, -1 = the other one, 0 = neither.
+        void Hold(int way)
+        {
+            long now = TimingEngine.Now;
+            if (releases != _releasedAll) // a pause let go of everything
+            {
+                if (presses.Count > 0 && presses[^1].Up == long.MaxValue) presses[^1] = presses[^1] with { Up = now };
+                (held, heldWay, releases) = (null, 0, _releasedAll);
+            }
+            if (heldWay == way) return;
+            if (held is { } old)
+            {
+                _input.KeyComboUp(old);
+                presses[^1] = presses[^1] with { Up = now };
+            }
+            held = way == 0 ? null : way > 0 ? increaseKey : decreaseKey;
+            heldWay = way;
+            if (held is { } key)
+            {
+                _input.KeyComboDown(key);
+                presses.Add((now, long.MaxValue, way));
+            }
+            presses.RemoveAll(k => k.Up != long.MaxValue && now - k.Up > TimingEngine.MsToTicks(2000));
+        }
+
+        // Degrees the bar has been told to turn since a moment in time (positive = growing angle).
+        double TurnedSince(long fromTicks)
+        {
+            long now = TimingEngine.Now;
+            double total = 0;
+            foreach (var (down, up, way) in presses)
+            {
+                long from = Math.Max(down, fromTicks), to = Math.Min(up, now);
+                if (to > from) total += way * TimingEngine.TicksToMs(to - from) / 1000 * degreesPerSecond;
+            }
+            return total;
+        }
+
+        bool Look(out double? bar)
+        {
+            bar = null;
+            var (left, top) = Resolve(bx, by);
+            long at = TimingEngine.Now;
+            if (!_screen.TryCapture(left, top, size, size, ref pixels)) return false;
+            detector.Look(pixels, TimingEngine.TicksToMs(at - started));
+            bar = detector.BarAngle;
+            return true;
+        }
+
+        // Holds the "clockwise" key briefly while watching the bar: which way it really turns it,
+        // how fast, and how long the picture takes to show the bar starting to move.
+        bool Calibrate(double before)
+        {
+            const double PressMs = 200, WatchMs = 350, MovedDegrees = 2;
+            var samples = new List<(double Ms, double Angle)>();
+            _input.KeyComboDown(a.ClockwiseKey);
+            long down = TimingEngine.Now;
+            bool released = false;
+            try
+            {
+                while (TimingEngine.TicksToMs(TimingEngine.Now - down) < WatchMs)
+                {
+                    if (!released && TimingEngine.TicksToMs(TimingEngine.Now - down) >= PressMs)
+                    {
+                        _input.KeyComboUp(a.ClockwiseKey);
+                        released = true;
+                    }
+                    long at = TimingEngine.Now;
+                    if (Look(out var angle) && angle is double seenAngle) samples.Add((TimingEngine.TicksToMs(at - down), seenAngle));
+                    _t = TimingEngine.Now;
+                    if (!Advance(5, scaled: false)) return false;
+                }
+            }
+            finally
+            {
+                if (!released) _input.KeyComboUp(a.ClockwiseKey);
+            }
+
+            int firstMoved = samples.FindIndex(p => Math.Abs(BarBlockDetector.Wrap(p.Angle - before)) >= MovedDegrees);
+            double turned = samples.Count > 0 ? BarBlockDetector.Wrap(samples[^1].Angle - before) : 0;
+            if (firstMoved < 0 || Math.Abs(turned) < 2 * MovedDegrees)
+            {
+                Log.Info($"Block: {a.ClockwiseKey.Display} did not visibly turn the bar while it was held; assuming it turns clockwise, at about {degreesPerSecond:0} degrees a second.");
+                return true;
+            }
+            if (turned < 0) (increaseKey, decreaseKey) = (a.AnticlockwiseKey, a.ClockwiseKey);
+            degreesPerSecond = Math.Clamp(Math.Abs(turned) / (PressMs / 1000), 20, 3000);
+            // The picture showed MovedDegrees of turning at that sample: take off the time that much turning takes.
+            pictureLagMs = Math.Clamp(samples[firstMoved].Ms - MovedDegrees / degreesPerSecond * 1000, 0, 200);
+            Log.Info($"Block: {a.ClockwiseKey.Display} turns the bar {(turned > 0 ? "clockwise" : "anticlockwise")} at about {degreesPerSecond:0} degrees a second; " +
+                     $"the picture shows it about {pictureLagMs:0} ms after the key goes down.");
+            return true;
+        }
+
+        try
+        {
+            while (true)
+            {
+                if (watchUntil != 0 && TimingEngine.Now >= watchUntil) break;
+
+                // No marker, no steering, straight away; and once it has been gone a moment, the game is over.
+                if (anchor is not null)
+                {
+                    if (AnchorShowing(a, anchor)) anchorLastSeen = TimingEngine.Now;
+                    else
+                    {
+                        Hold(0);
+                        if (TimingEngine.TicksToMs(TimingEngine.Now - anchorLastSeen) >= AnchorGraceMs) break;
+                        _t = TimingEngine.Now;
+                        if (!Advance(a.PollMs, scaled: false)) return false;
+                        if (!Housekeeping()) return false;
+                        continue;
+                    }
+                }
+
+                long lookedAt = TimingEngine.Now;
+                if (previousLook != 0) loopMs += (TimingEngine.TicksToMs(lookedAt - previousLook) - loopMs) * 0.2;
+                previousLook = lookedAt;
+                if (!Look(out var seen) || seen is not double bar)
+                {
+                    Hold(0); // cannot see the bar: do nothing rather than guess
+                }
+                else if (!calibrated)
+                {
+                    calibrated = true;
+                    if (!Calibrate(bar)) return false;
+                }
+                else
+                {
+                    // The picture shows the bar a moment ago; add the turning asked for since then.
+                    double barNow = bar + TurnedSince(lookedAt - TimingEngine.MsToTicks(pictureLagMs));
+                    if (detector.Choose(degreesPerSecond) is not { } threat)
+                    {
+                        Hold(0); // nothing coming: stay put
+                    }
+                    else
+                    {
+                        double error = BarBlockDetector.Wrap(threat.Angle - barNow);
+                        int way = Math.Sign(error);
+                        double distance = Math.Abs(error);
+                        if (distance <= a.AimToleranceDegrees)
+                        {
+                            Hold(0);
+                        }
+                        else if (distance > degreesPerSecond * Math.Max(loopMs, a.PollMs) / 1000)
+                        {
+                            Hold(way); // a long way to go: keep the key down until the next look
+                        }
+                        else
+                        {
+                            // Nearly there: a tap of just the right length, instead of holding on until
+                            // the next look and sailing past.
+                            Hold(0);
+                            double tapMs = distance / degreesPerSecond * 1000;
+                            if (tapMs >= 3)
+                            {
+                                Hold(way);
+                                _t = TimingEngine.Now;
+                                bool ok = Advance(tapMs, scaled: false);
+                                Hold(0);
+                                if (!ok) return false;
+                            }
+                        }
+                    }
+                }
+
+                _t = TimingEngine.Now;
+                if (!Advance(a.PollMs, scaled: false)) return false;
+                if (!Housekeeping()) return false; // a pause or lost focus lets go of every key
+            }
+        }
+        finally
+        {
+            Hold(0);
+        }
+        _t = TimingEngine.Now;
+        return true;
+    }
+
     /// <summary>The action's start/stop marker as pixels, decoded once per run. Null if it has none.</summary>
-    private int[]? GetAnchor(AreaWatchAction a)
+    private int[]? GetAnchor(IHasMarker a)
     {
         if (_anchors.TryGetValue(a, out var cached)) return cached;
         int[]? pixels = null;
@@ -910,7 +1136,7 @@ public sealed class ClickEngine : IDisposable
     /// Also look around the snipped spot if the marker is not where it was last seen. Off for the
     /// check right before a click, which must be quick; the regular checks do the searching.
     /// </param>
-    private bool AnchorShowing(AreaWatchAction a, int[] anchor, bool search = true)
+    private bool AnchorShowing(IHasMarker a, int[] anchor, bool search = true)
     {
         var (sx, sy) = _anchorShift.GetValueOrDefault(a);
         var (x, y) = Resolve(a.AnchorX + sx, a.AnchorY + sy);
@@ -948,7 +1174,7 @@ public sealed class ClickEngine : IDisposable
     /// spot with a border around it, and how alike it was. Without these, a marker that never
     /// matches leaves an empty recording.
     /// </summary>
-    private void SaveMarkerSnapshot(AreaWatchAction a)
+    private void SaveMarkerSnapshot(IHasMarker a)
     {
         const int border = 120, maxSnapshots = 30;
         if (_markerSnapshots >= maxSnapshots || TimingEngine.Now < _markerSnapshotNextAt) return;

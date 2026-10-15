@@ -28,6 +28,106 @@
       <Setter Property="ToolTip" Value="Then click the spot on screen (any monitor). Esc cancels." />
     </Style>
 
+    <!-- ===== Block with a bar ===== -->
+    <DataTemplate DataType="{x:Type models:BarBlockAction}">
+      <StackPanel>
+        <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,10"
+                   Text="For games where you steer a bar round a circle to block things flying out from the middle. Have the game showing, then pick the centre, then click right on the bar." />
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Centre" />
+          <TextBlock Style="{StaticResource Axis}" Text="X" />
+          <TextBox Style="{StaticResource NumBox}" Width="62" Text="{Binding CentreX, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Axis}" Text="Y" Margin="8,0,6,0" />
+          <TextBox Style="{StaticResource NumBox}" Width="62" Text="{Binding CentreY, UpdateSourceTrigger=PropertyChanged}" />
+          <Button Style="{StaticResource PickButton}" Content="PICK THE CENTRE" CommandParameter="centre"
+                  ToolTip="Then click the middle of the circle the bar goes round (where things fly out from). Esc cancels." />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Bar" />
+          <TextBlock Style="{StaticResource Axis}" Text="circle" />
+          <TextBox Style="{StaticResource NumBox}" Width="62" Text="{Binding Radius, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Axis}" Text="px out, colour" Margin="6,0,6,0" />
+          <Border Width="22" Height="22" CornerRadius="5" BorderBrush="{StaticResource LineBrush}" BorderThickness="2"
+                  Background="{Binding BarColor, Converter={StaticResource HexToBrush}}" Margin="0,0,6,0" />
+          <TextBox Style="{StaticResource BaseTextBox}" Width="90" FontFamily="{StaticResource MonoFont}" Text="{Binding BarColor, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}" Margin="138,0,0,12">
+          <Button Style="{StaticResource PickButton}" Content="PICK THE BAR" CommandParameter="bar" Margin="0"
+                  ToolTip="Then click right on the bar. Its distance from the centre sets the circle, and the colour under the click is what the bar is found by." />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}" Margin="0,0,0,12">
+          <TextBlock Style="{StaticResource Lbl}" Text="Turn keys" />
+          <TextBlock Style="{StaticResource Axis}" Text="clockwise" />
+          <controls:HotkeyBox Width="90" Combo="{Binding ClockwiseKey}" />
+          <TextBlock Style="{StaticResource Axis}" Text="anticlockwise" Margin="12,0,6,0" />
+          <controls:HotkeyBox Width="90" Combo="{Binding AnticlockwiseKey}" />
+        </StackPanel>
+        <TextBlock Style="{StaticResource Hint}" Margin="138,-6,0,12"
+                   Text="At the start of each run it taps the clockwise key once to check which way each key really turns the bar, and how fast." />
+
+        <DockPanel Margin="0,0,0,4" LastChildFill="True">
+          <TextBlock Style="{StaticResource Lbl}" Text="Only while" />
+          <Border Height="34" MaxWidth="150" CornerRadius="6" BorderBrush="{StaticResource CheeseDarkBrush}" BorderThickness="2"
+                  Background="{StaticResource InputBrush}" Padding="2" Margin="0,0,8,0"
+                  Visibility="{Binding HasAnchor, Converter={StaticResource BoolToVis}}">
+            <Image Source="{Binding AnchorImage, Converter={StaticResource Base64ToImage}}" Stretch="Uniform" />
+          </Border>
+          <TextBlock Style="{StaticResource Axis}" Text="{Binding AnchorText}" TextWrapping="Wrap" />
+        </DockPanel>
+        <StackPanel Style="{StaticResource Row}" Margin="138,0,0,12">
+          <Button Content="SNIP A START / STOP MARKER" Margin="0,0,8,0"
+                  Command="{Binding DataContext.SnipMarkerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                  ToolTip="Freezes the screen so you can drag a box round something that shows only while the game is on, such as its timer label. Steering waits for it, stops the moment it goes, and ends soon after." />
+          <Button Content="✕" Padding="8,2" Margin="0" ToolTip="Remove the marker"
+                  Command="{Binding DataContext.ClearMarkerCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                  Visibility="{Binding HasAnchor, Converter={StaticResource BoolToVis}}" />
+        </StackPanel>
+
+        <TextBlock Text="Block things carrying these colours (most valuable first)" Margin="0,0,0,6" />
+        <ItemsControl ItemsSource="{Binding Targets}" Focusable="False">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                <Border Width="34" Height="34" CornerRadius="8" BorderBrush="{StaticResource LineBrush}" BorderThickness="2"
+                        Background="{Binding Color, Converter={StaticResource HexToBrush}}" Margin="0,0,8,0" />
+                <TextBox Style="{StaticResource BaseTextBox}" Width="90" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" ToolTip="A name, just for you." />
+                <TextBox Style="{StaticResource BaseTextBox}" Width="86" Margin="8,0,0,0" FontFamily="{StaticResource MonoFont}" Text="{Binding Color, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Style="{StaticResource Axis}" Text="tolerance ±" Margin="10,0,6,0" />
+                <TextBox Style="{StaticResource NumBox}" Width="52" Text="{Binding Tolerance, UpdateSourceTrigger=PropertyChanged}" />
+                <Button Content="▲" Padding="8,2" Margin="10,0,0,0" ToolTip="Move up: more valuable, blocked first when there is time for only one"
+                        Command="{Binding DataContext.MoveTargetUpCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        CommandParameter="{Binding}" />
+                <Button Content="✕" Padding="8,2" Margin="6,0,0,0" ToolTip="Remove"
+                        Command="{Binding DataContext.RemoveRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        CommandParameter="{Binding}" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <StackPanel Style="{StaticResource Row}" Margin="0,4,0,12">
+          <Button Content="+ ADD A COLOUR" Margin="0,0,8,0" Style="{StaticResource PickButton}" CommandParameter="target"
+                  ToolTip="Then click on one of the things to block, on its most distinctive colour." />
+          <Button Content="USE THE RADIATION COLOURS" Margin="0,0,8,0"
+                  Command="{Binding DataContext.UseRadiationColoursCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                  ToolTip="Fills in the four kinds of radiation from Galaxy Idle Clicker's Radiations game: green, purple, yellow, cyan." />
+          <Button Content="TEST ON THE SCREEN NOW" Margin="0"
+                  Command="{Binding DataContext.TestBarBlockCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                  ToolTip="Watches the circle for about three seconds and says whether it can find the bar and what it sees flying out. No keys are pressed." />
+        </StackPanel>
+
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Keep steering for" />
+          <TextBox Style="{StaticResource NumBox}" Width="80" Text="{Binding WatchForMs, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="ms  (0 = until the marker goes)" />
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}" Margin="0">
+          <TextBlock Style="{StaticResource Lbl}" Text="Lined up within" />
+          <TextBox Style="{StaticResource NumBox}" Width="52" Text="{Binding AimToleranceDegrees, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Style="{StaticResource Unit}" Text="degrees" />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+
     <!-- ===== Click ===== -->
     <DataTemplate DataType="{x:Type models:ClickAction}">
       <StackPanel>

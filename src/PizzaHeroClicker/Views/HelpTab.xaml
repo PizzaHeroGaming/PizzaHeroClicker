@@ -84,6 +84,18 @@
 
       <Border Style="{StaticResource Card}">
         <StackPanel>
+          <TextBlock Style="{StaticResource CardTitle}" Text="BLOCK THINGS WITH A BAR" />
+          <TextBlock Style="{StaticResource Step}" Text="For games where things fly out from the middle of a circle and you turn a bar round it with two keys to block them." />
+          <TextBlock Style="{StaticResource Step}" Text="1.  With the game showing, add Block with a bar. PICK THE CENTRE, then PICK THE BAR by clicking right on it: that sets its circle and colour." />
+          <TextBlock Style="{StaticResource Step}" Text="2.  Set the two turn keys. Each run starts by holding the clockwise key briefly to learn which way each key turns the bar and how fast." />
+          <TextBlock Style="{StaticResource Step}" Text="3.  List the colours to block, most valuable first (USE THE RADIATION COLOURS fills in the four radiation kinds). When there is time for only one, the highest in the list wins." />
+          <TextBlock Style="{StaticResource Step}" Text="4.  TEST ON THE SCREEN NOW says whether it can see the bar and what is flying out. No keys are pressed." />
+          <TextBlock Style="{StaticResource Step}" Margin="0" Text="5.  Snip a start / stop marker, or set Keep steering for to the game's length. It needs about two seconds at the start to learn the backdrop." />
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
           <TextBlock Style="{StaticResource CardTitle}" Text="PROFILES AND SAVING" />
           <TextBlock Style="{StaticResource Step}" Text="•  A profile holds everything: actions, intervals, hotkeys, target window and overlays." />
           <TextBlock Style="{StaticResource Step}" Text="•  Profiles are grouped by game. Pick the game on the left of the header, then one of its profiles. MANAGE has New game, New profile in this game, and Move profile to another game (pick the game from a list, or choose + New game there). The same profile name can be used in different games." />

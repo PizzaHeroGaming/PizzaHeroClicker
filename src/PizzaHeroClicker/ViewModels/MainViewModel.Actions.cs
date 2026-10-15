@@ -69,6 +69,7 @@ public partial class MainViewModel
             "pixelWait" => new PixelWaitAction(),
             "pixelClick" => new PixelClickAction(),
             "areaWatch" => new AreaWatchAction(),
+            "barBlock" => new BarBlockAction { Targets = new(BarBlockAction.RadiationDefaults()) },
             _ => new ClickAction { Button = Profile.DefaultButton, Kind = Profile.DefaultKind },
         };
         if (!_s.Dialogs.EditAction(action, $"Add {action.TypeName.ToLowerInvariant()} action", PickInProfileSpaceAsync, PickRegionInProfileSpaceAsync)) return;

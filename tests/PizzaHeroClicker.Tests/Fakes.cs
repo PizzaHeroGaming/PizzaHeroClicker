@@ -34,9 +34,11 @@ internal sealed class FakeInput : IInputService
     public void ButtonDown(ClickButton button) { HeldCount++; Add($"down {button}"); }
     public void ButtonUp(ClickButton button) { HeldCount--; Add($"up {button}"); }
     public void Scroll(ScrollDirection direction, int notches) => Add($"scroll {direction} {notches}");
-    public void KeyComboDown(KeyCombo combo) { HeldCount++; Add($"keydown {combo}"); }
-    public void KeyComboUp(KeyCombo combo) { HeldCount--; Add($"keyup {combo}"); }
-    public void ReleaseAll() { HeldCount = 0; Add("releaseAll"); }
+    /// <summary>Called on the engine thread whenever a key goes down (true) or up (false); null key = everything released.</summary>
+    public Action<KeyCombo?, bool>? KeyChanged;
+    public void KeyComboDown(KeyCombo combo) { HeldCount++; Add($"keydown {combo}"); KeyChanged?.Invoke(combo, true); }
+    public void KeyComboUp(KeyCombo combo) { HeldCount--; Add($"keyup {combo}"); KeyChanged?.Invoke(combo, false); }
+    public void ReleaseAll() { HeldCount = 0; Add("releaseAll"); KeyChanged?.Invoke(null, false); }
 }
 
 internal sealed class FakeScreen : IScreenService

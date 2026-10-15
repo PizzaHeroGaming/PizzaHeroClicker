@@ -80,6 +80,7 @@ public class ProfileJsonTests
         profile.Actions.Add(new MoveAction { X = 9, Y = 8, DurationMs = 12 });
         profile.Actions.Add(new PixelWaitAction { X = 5, Y = 6, Color = "#FF8800", Tolerance = 3, OnTimeout = PixelTimeoutBehavior.Stop });
         profile.Actions.Add(new PixelClickAction { X = 7, Y = 8, Color = "#00FF00", ClickAtPixel = false, ClickX = 70, ClickY = 80 });
+        profile.Actions.Add(new BarBlockAction { CentreX = 900, CentreY = 640, Radius = 546, ClockwiseKey = KeyCombo.Parse("Left"), Targets = new(BarBlockAction.RadiationDefaults()) });
         profile.Hotkeys.Toggle = KeyCombo.Parse("Ctrl+F6");
         profile.Repeat.Mode = RepeatMode.UntilTime;
         profile.Window.Title = "Game";
@@ -88,7 +89,12 @@ public class ProfileJsonTests
         var copy = ProfileJson.Deserialize<Profile>(json)!;
 
         Assert.Equal(json, ProfileJson.Serialize(copy));
-        Assert.Equal(8, copy.Actions.Count);
+        Assert.Equal(9, copy.Actions.Count);
+        var bar = (BarBlockAction)copy.Actions[8];
+        Assert.Equal((900, 640, 546), (bar.CentreX, bar.CentreY, bar.Radius));
+        Assert.Equal(KeyCombo.Parse("Left"), bar.ClockwiseKey);
+        Assert.Equal(["green", "purple", "yellow", "cyan"], bar.Targets.Select(t => t.Name));
+        Assert.Contains("\"type\": \"barBlock\"", json);
         Assert.Equal(profile.Actions.Select(a => a.GetType()), copy.Actions.Select(a => a.GetType()));
         Assert.Equal(-1920, ((ClickAction)copy.Actions[0]).X);
         Assert.Equal(2, ((KeyPressAction)copy.Actions[1]).Keys.Count);

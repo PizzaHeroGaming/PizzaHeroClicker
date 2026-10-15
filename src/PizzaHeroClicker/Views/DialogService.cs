@@ -32,7 +32,76 @@ public sealed class DialogService(ScreenService screen) : IDialogService
     }
 
     public bool EditAction(ActionBase action, string title, Func<Task<PickResult?>> pickPoint, Func<Task<RegionPick?>> pickRegion) =>
-        ShowModal(new ActionEditorWindow(new ActionEditorViewModel(action, title, pickPoint, pickRegion, CaptureTargetPictureAsync, TestAreaWatchAsync, SnipMarkerAsync))) == true;
+        ShowModal(new ActionEditorWindow(new ActionEditorViewModel(action, title, pickPoint, pickRegion, CaptureTargetPictureAsync, TestAreaWatchAsync, SnipMarkerAsync)
+        {
+            TestBar = TestBarBlockAsync,
+        })) == true;
+
+    /// <summary>
+    /// Watches the bar's circle for about three seconds with a bar-block action's settings and
+    /// says what it saw: the bar, and anything flying out. No keys are pressed.
+    /// </summary>
+    public async Task TestBarBlockAsync(BarBlockAction action)
+    {
+        const string title = "Block test";
+        string message;
+        var hidden = await HideOwnWindowsAsync();
+        try
+        {
+            var copy = (BarBlockAction)action.Clone();
+            copy.Normalize();
+            if (CoordinateOrigin() is not var (ox, oy))
+            {
+                message = "The target window isn't open, so the circle can't be located.";
+            }
+            else
+            {
+                var (x, y, size) = copy.LookBox;
+                var detector = new BarBlockDetector(copy);
+                int[] pixels = [];
+                var seen = new int[copy.Targets.Count];
+                int looks = 0, barLooks = 0;
+                double? lastBar = null;
+                int lastBarPixels = 0;
+                long start = Environment.TickCount64;
+                while (Environment.TickCount64 - start < 3200)
+                {
+                    if (screen.TryCapture(x + ox, y + oy, size, size, ref pixels))
+                    {
+                        looks++;
+                        detector.Look(pixels, Environment.TickCount64 - start);
+                        if (detector.BarAngle is double angle) (barLooks, lastBar, lastBarPixels) = (barLooks + 1, angle, detector.BarPixels);
+                        foreach (var group in detector.Threats.GroupBy(t => t.Target))
+                            seen[group.Key] = Math.Max(seen[group.Key], group.Count());
+                    }
+                    await Task.Delay(50);
+                }
+                var text = new System.Text.StringBuilder();
+                if (looks == 0) text.AppendLine("That part of the screen could not be captured.");
+                else if (lastBar is double bar)
+                    text.AppendLine($"Bar: found in {barLooks} of {looks} looks, last at {bar:0} degrees ({lastBarPixels} pixels of its colour on its circle).");
+                else
+                    text.AppendLine("Bar: NOT found on its circle. Click PICK THE BAR again, right on the bar, so its circle and colour are set from it.");
+                if (looks > 0)
+                {
+                    var kinds = copy.Targets.Select((t, i) => seen[i] > 0 ? $"{(t.Name.Length > 0 ? t.Name : t.Color)} ({seen[i]} at once)" : null).Where(s => s is not null).ToList();
+                    text.AppendLine(kinds.Count > 0
+                        ? "Flying out, seen: " + string.Join(", ", kinds) + "."
+                        : "Nothing seen flying out. That is expected if the game was not sending anything during those three seconds; it only notices things once they move.");
+                }
+                message = text.ToString();
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            message = ex.Message;
+        }
+        finally
+        {
+            RestoreWindows(hidden);
+        }
+        Inform(title, message);
+    }
 
     /// <summary>
     /// Lets the user snip a fixed piece of the screen to use as a start/stop marker. Returns where

@@ -17,6 +17,9 @@ public partial class ActionEditorViewModel : ObservableObject
     public ActionBase Action { get; }
     public string Title { get; }
 
+    /// <summary>Looks at the screen with a bar-block action's settings and says what it sees. Set by the dialog host.</summary>
+    public Func<BarBlockAction, Task>? TestBar { get; init; }
+
     [ObservableProperty] private string _error = "";
     [ObservableProperty] private bool _isPicking;
 
@@ -55,6 +58,42 @@ public partial class ActionEditorViewModel : ObservableObject
     private void RemoveRule(object? parameter)
     {
         if (Action is AreaWatchAction area && parameter is AreaRule rule) area.Rules.Remove(rule);
+        if (Action is BarBlockAction bar && parameter is BlockTarget target) bar.Targets.Remove(target);
+    }
+
+    /// <summary>Moves a thing to block one place up the list: higher up = more valuable.</summary>
+    [RelayCommand]
+    private void MoveTargetUp(object? parameter)
+    {
+        if (Action is not BarBlockAction bar || parameter is not BlockTarget target) return;
+        int i = bar.Targets.IndexOf(target);
+        if (i > 0) bar.Targets.Move(i, i - 1);
+    }
+
+    /// <summary>Fills in the four kinds of radiation from Galaxy Idle Clicker's Radiations game.</summary>
+    [RelayCommand]
+    private void UseRadiationColours()
+    {
+        if (Action is not BarBlockAction bar) return;
+        bar.Targets.Clear();
+        foreach (var target in BarBlockAction.RadiationDefaults()) bar.Targets.Add(target);
+    }
+
+    [RelayCommand]
+    private async Task TestBarBlock()
+    {
+        if (IsPicking || Action is not BarBlockAction bar || TestBar is null) return;
+        Error = ValidateAction(bar) ?? "";
+        if (Error.Length > 0) return;
+        IsPicking = true;
+        try
+        {
+            await TestBar(bar);
+        }
+        finally
+        {
+            IsPicking = false;
+        }
     }
 
     /// <summary>Picks a point on screen and writes it into the fields named by <paramref name="target"/>.</summary>
@@ -93,6 +132,23 @@ public partial class ActionEditorViewModel : ObservableObject
                     break;
                 case AreaWatchAction a: // the eyedropper adds a colour rule; only the colour matters
                     a.Rules.Add(new AreaRule { Color = pick.Color.ToHex() });
+                    break;
+                case BarBlockAction a when target == "centre":
+                    (a.CentreX, a.CentreY) = (pick.X, pick.Y);
+                    break;
+                case BarBlockAction a when target == "bar":
+                    // The bar sets both how far out it travels and what colour to look for.
+                    if (a.CentreX == 0 && a.CentreY == 0)
+                    {
+                        Error = "Pick the centre first, then the bar.";
+                        break;
+                    }
+                    a.Radius = (int)Math.Round(Math.Sqrt(Math.Pow(pick.X - a.CentreX, 2) + Math.Pow(pick.Y - a.CentreY, 2)));
+                    a.BarColor = pick.Color.ToHex();
+                    a.InnerRadius = Math.Min(a.InnerRadius, Math.Max(0, a.Radius - 20));
+                    break;
+                case BarBlockAction a: // the eyedropper adds something to block, by its colour
+                    a.Targets.Add(new BlockTarget { Color = pick.Color.ToHex() });
                     break;
             }
         }
@@ -141,13 +197,22 @@ public partial class ActionEditorViewModel : ObservableObject
     [RelayCommand]
     private async Task SnipMarker()
     {
-        if (IsPicking || Action is not AreaWatchAction area) return;
+        if (IsPicking || Action is not (AreaWatchAction or BarBlockAction)) return;
         IsPicking = true;
         try
         {
             if (await _snipMarker() is not var (region, image)) return;
-            (area.AnchorX, area.AnchorY, area.AnchorWidth, area.AnchorHeight) = (region.X, region.Y, region.Width, region.Height);
-            area.AnchorImage = image;
+            switch (Action)
+            {
+                case AreaWatchAction area:
+                    (area.AnchorX, area.AnchorY, area.AnchorWidth, area.AnchorHeight) = (region.X, region.Y, region.Width, region.Height);
+                    area.AnchorImage = image;
+                    break;
+                case BarBlockAction bar:
+                    (bar.AnchorX, bar.AnchorY, bar.AnchorWidth, bar.AnchorHeight) = (region.X, region.Y, region.Width, region.Height);
+                    bar.AnchorImage = image;
+                    break;
+            }
         }
         finally
         {
@@ -159,6 +224,7 @@ public partial class ActionEditorViewModel : ObservableObject
     private void ClearMarker()
     {
         if (Action is AreaWatchAction area) area.AnchorImage = "";
+        if (Action is BarBlockAction bar) bar.AnchorImage = "";
     }
 
     /// <summary>Runs the area watch against the screen once, without clicking, and reports what it saw.</summary>
@@ -201,6 +267,11 @@ public partial class ActionEditorViewModel : ObservableObject
             AreaWatchAction a when a.Rules.All(r => r.DontClick) => "Every picture and colour is set to Don't click, so nothing would ever be clicked.",
             AreaWatchAction a when a.Rules.Any(r => !r.IsImage && !PixelColor.TryParse(r.Color, out _)) => "Every colour must look like #RRGGBB.",
             AreaWatchAction a when a.Width < 1 || a.Height < 1 => "Select an area to watch.",
+            BarBlockAction { CentreX: 0, CentreY: 0 } => "Pick the centre of the circle the bar travels round.",
+            BarBlockAction b when !PixelColor.TryParse(b.BarColor, out _) => "The bar's colour must look like #RRGGBB.",
+            BarBlockAction { Targets.Count: 0 } => "Add at least one colour to block (or use the radiation colours).",
+            BarBlockAction b when b.Targets.Any(t => !PixelColor.TryParse(t.Color, out _)) => "Every colour must look like #RRGGBB.",
+            BarBlockAction b when b.ClockwiseKey.IsEmpty || b.AnticlockwiseKey.IsEmpty || b.ClockwiseKey == b.AnticlockwiseKey => "Set two different keys for turning the bar.",
             _ => null,
         };
     }

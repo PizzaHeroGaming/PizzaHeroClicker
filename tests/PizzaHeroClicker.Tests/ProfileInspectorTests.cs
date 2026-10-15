@@ -91,6 +91,22 @@ public class ProfileInspectorTests
     }
 
     [Fact]
+    public void SteeringABarIsListedWithItsKeysAndCanBeSwitchedOffLikeKeyPresses()
+    {
+        var bar = new BarBlockAction { CentreX = 500, CentreY = 400, Radius = 300, Targets = new(BarBlockAction.RadiationDefaults()) };
+        var review = ProfileInspector.Inspect(GameProfile(bar));
+        Assert.True(Has(review, ReviewLevel.Caution, "holding A and D"));
+        Assert.Equal(1, review.KeyActions);
+
+        var sneaky = new BarBlockAction { CentreX = 500, CentreY = 400, ClockwiseKey = KeyCombo.Parse("Win+R"), Targets = new(BarBlockAction.RadiationDefaults()) };
+        Assert.True(Has(ProfileInspector.Inspect(GameProfile(sneaky)), ReviewLevel.Danger, "Windows key"));
+
+        var profile = GameProfile(bar);
+        Assert.Equal(1, ProfileInspector.TurnKeyPressesOff(profile));
+        Assert.False(profile.Actions[0].Enabled);
+    }
+
+    [Fact]
     public void AnImportedProfileCannotBringItsOwnControls()
     {
         var imported = GameProfile(new ClickAction());
