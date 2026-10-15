@@ -144,7 +144,7 @@ public sealed class BarBlockDetector
     private (double? Angle, int Pixels) Locate(int[] counts, double? near)
     {
         Array.Copy(counts, _bins, 360);
-        (double Angle, int Count)? best = null;
+        (double Angle, int Count, int Span)? best = null;
         double bestScore = double.MaxValue;
         foreach (var run in Runs())
         {
@@ -153,6 +153,8 @@ public sealed class BarBlockDetector
             double score = near is double p ? Math.Abs(Wrap(run.Angle - p)) - run.Count * 1e-6 : -run.Count;
             if (best is null || score < bestScore) (best, bestScore) = (run, score);
         }
+        if (best is { Span: < 90 } found) // a "bar" round a quarter of the circle is not one
+            BarWidthDegrees = found.Span >= BarWidthDegrees ? found.Span : BarWidthDegrees + (found.Span - BarWidthDegrees) * 0.02;
         return (best?.Angle, best?.Count ?? 0);
     }
 
@@ -162,6 +164,12 @@ public sealed class BarBlockDetector
         return Runs().Count(r => r.Count >= MinBarPixels);
     }
 
+    /// <summary>
+    /// How far inside the bar's ends something must arrive to count as blocked by it, in degrees:
+    /// the ends are not trusted to the last pixel.
+    /// </summary>
+    public const double EdgeMarginDegrees = 3;
+
     /// <summary>Changes this small in a degree's count are noise, not the bar.</summary>
     public const int BackdropSlack = 2;
     private readonly int[] _raw = new int[360], _counted = new int[360];
@@ -169,11 +177,11 @@ public sealed class BarBlockDetector
     private bool[]? _static;
 
     /// <summary>Runs of non-empty 1-degree bins (allowing one-bin gaps, and wrapping past 360), with their mean angle.</summary>
-    private IEnumerable<(double Angle, int Count)> Runs()
+    private IEnumerable<(double Angle, int Count, int Span)> Runs()
     {
         int start = Array.FindIndex(_bins, b => b == 0);
-        if (start < 0) { yield return (0, _bins.Sum()); yield break; } // all the way round: not a bar
-        int count = 0;
+        if (start < 0) { yield return (0, _bins.Sum(), 360); yield break; } // all the way round: not a bar
+        int count = 0, first = -1, last = -1;
         double sx = 0, sy = 0;
         int gap = 0;
         for (int k = 1; k <= 361; k++)
@@ -183,6 +191,8 @@ public sealed class BarBlockDetector
             if (n > 0)
             {
                 count += n;
+                if (first < 0) first = k;
+                last = k;
                 double a = (bin + 0.5) * Math.PI / 180;
                 sx += n * Math.Cos(a);
                 sy += n * Math.Sin(a);
@@ -190,10 +200,18 @@ public sealed class BarBlockDetector
                 continue;
             }
             if (++gap <= 1 && k <= 360) continue;
-            if (count > 0) yield return (Normalise(Math.Atan2(sy, sx) * 180 / Math.PI), count);
-            (count, sx, sy) = (0, 0, 0);
+            if (count > 0) yield return (Normalise(Math.Atan2(sy, sx) * 180 / Math.PI), count, last - first + 1);
+            (count, sx, sy, first, last) = (0, 0, 0, -1, -1);
         }
     }
+
+    /// <summary>
+    /// How many degrees of the circle the bar covers. Anything arriving within that span is
+    /// blocked, so a long bar need not be centred on its target. Learned as the bar is seen: it
+    /// grows to the widest seen at once, and shrinks only slowly (the bar can look short for a
+    /// moment while part of it is over backdrop of its own colour).
+    /// </summary>
+    public double BarWidthDegrees { get; private set; }
 
     private void FindThreats(int[] pixels, double timeMs)
     {
@@ -279,7 +297,9 @@ public sealed class BarBlockDetector
         double? known = barAngle ?? BarAngle;
         double bar = known ?? 0;
         double Escape(BarThreat t) => t.SecondsToEscape;
-        bool Reachable(BarThreat t) => known is null || Math.Abs(Wrap(t.Angle - bar)) / Math.Max(1, degreesPerSecond) <= Escape(t);
+        // The bar only has to get its nearer end there, not its middle.
+        double halfWidth = Math.Max(0, BarWidthDegrees / 2 - EdgeMarginDegrees);
+        bool Reachable(BarThreat t) => known is null || Math.Max(0, Math.Abs(Wrap(t.Angle - bar)) - halfWidth) / Math.Max(1, degreesPerSecond) <= Escape(t);
 
         var reachable = _threats.Where(Reachable).ToList();
         if (current is not null)

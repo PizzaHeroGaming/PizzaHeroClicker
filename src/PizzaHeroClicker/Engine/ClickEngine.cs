@@ -1130,7 +1130,7 @@ public sealed class ClickEngine : IDisposable
                         Picture($"steer-{++steerPictures:00}.png");
                     }
                     string threats = string.Join("; ", detector.Threats.Select(t => $"kind {t.Target + 1} at {t.Angle:0} deg, {t.Distance:0} px out, crosses in {t.SecondsToEscape:0.00} s"));
-                    Note($"bar {(seen is double sb ? $"{sb:0.0} deg ({detector.BarPixels} px)" : "NOT FOUND")}, patches {detector.Patches}, holding {(heldWay > 0 ? increaseKey.Display : heldWay < 0 ? decreaseKey.Display : "nothing")}{(detector.Learning ? ", still learning the backdrop" : "")}; " +
+                    Note($"bar {(seen is double sb ? $"{sb:0.0} deg ({detector.BarPixels} px, {detector.BarWidthDegrees:0} deg wide)" : "NOT FOUND")}, patches {detector.Patches}, holding {(heldWay > 0 ? increaseKey.Display : heldWay < 0 ? decreaseKey.Display : "nothing")}{(detector.Learning ? ", still learning the backdrop" : "")}; " +
                          (threats.Length > 0 ? "flying out: " + threats : "nothing flying out"));
                 }
                 // Where the bar is now: as seen (a moment ago) plus the turning asked for since. If it
@@ -1169,8 +1169,11 @@ public sealed class ClickEngine : IDisposable
                         double error = BarBlockDetector.Wrap(threat.Angle - barNow);
                         Note($"  steering for kind {threat.Target + 1} at {threat.Angle:0} deg; bar now about {barNow:0} deg; {error:+0;-0} deg to go");
                         int way = Math.Sign(error);
-                        double distance = Math.Abs(error);
-                        if (distance <= a.AimToleranceDegrees)
+                        // Close enough once it is safely within the bar's span: a long bar need not
+                        // be centred on it. When moving, aim for halfway between there and dead centre.
+                        double within = Math.Max(a.AimToleranceDegrees, detector.BarWidthDegrees / 2 - BarBlockDetector.EdgeMarginDegrees);
+                        double distance = Math.Abs(error) - within / 2;
+                        if (Math.Abs(error) <= within)
                         {
                             Hold(0);
                         }

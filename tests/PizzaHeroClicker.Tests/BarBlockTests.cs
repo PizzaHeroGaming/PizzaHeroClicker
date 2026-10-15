@@ -50,9 +50,9 @@ internal static class ShieldGame
         return pixels;
     }
 
-    public static void Bar(int[] pixels, double degrees, int offX = 0, int offY = 0)
+    public static void Bar(int[] pixels, double degrees, int offX = 0, int offY = 0, double halfWidth = 6)
     {
-        for (double a = degrees - 6; a <= degrees + 6; a += 0.2)
+        for (double a = degrees - halfWidth; a <= degrees + halfWidth; a += 0.2)
         for (int r = Radius - 3; r <= Radius + 3; r++)
         {
             int x = Centre + offX + (int)Math.Round(r * Math.Cos(a * Math.PI / 180)), y = Centre + offY + (int)Math.Round(r * Math.Sin(a * Math.PI / 180));
@@ -192,13 +192,18 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
     [InlineData(66, false)] // four frames behind
     [InlineData(33, true)]  // and with red backdrop on the bar's circle, bigger than the bar, that hides it completely
     [InlineData(33, false, 10)] // and with the centre clicked 10 px off the real one
-    public void SteersTheBarInFrontOfTheBallsAndLetsGoOfTheKeysAtTheEnd(int pictureLagMs, bool redClouds, int centreOffPx = 0)
+    // A long bar that turns slowly. Half of these balls are out of reach whatever it does (more than
+    // the 100 degrees it can turn while one flies, plus its half-length, from where the last one was),
+    // so here it must block the ones it can reach.
+    [InlineData(33, false, 0, 24, 150, 0.4)]
+    public void SteersTheBarInFrontOfTheBallsAndLetsGoOfTheKeysAtTheEnd(int pictureLagMs, bool redClouds, int centreOffPx = 0, double barHalfWidth = 6, double turnSpeed = 400, double mustBlock = 0.8)
     {
         // A "shield" game run in real time: holding A turns the bar clockwise at 400 degrees a second,
         // D anticlockwise. A ball comes out of the middle every 0.7 s in a random direction and takes
         // 0.9 s to reach the bar's circle, so the bar can always get there in time if it sets off
         // promptly. Nothing tells the action which key does what: it finds out.
-        const double TurnSpeed = 400, BallSpeed = ShieldGame.Radius / 0.9;
+        double TurnSpeed = turnSpeed;
+        const double BallSpeed = ShieldGame.Radius / 0.9;
         var input = new FakeInput();
         var screen = new FakeScreen();
         var windows = new FakeWindows();
@@ -238,14 +243,14 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
                 double ms = lastMs;
                 var frame = ShieldGame.Backdrop(redClouds, solid: true);
                 double shown = history.LastOrDefault(h => h.Ms <= ms - pictureLagMs, history[0]).Angle;
-                ShieldGame.Bar(frame, shown, centreOffPx, -centreOffPx / 2);
+                ShieldGame.Bar(frame, shown, centreOffPx, -centreOffPx / 2, barHalfWidth);
                 for (int i = 0; i < balls.Count; i++)
                 {
                     double distance = (ms - balls[i].Born) * BallSpeed / 1000;
                     if (distance < 0 || outcome.ContainsKey(i)) continue;
                     if (distance >= ShieldGame.Radius)
                     {
-                        outcome[i] = Math.Abs(BarBlockDetector.Wrap(barAngle - balls[i].Angle)) <= 8; // the bar is 12 degrees wide
+                        outcome[i] = Math.Abs(BarBlockDetector.Wrap(barAngle - balls[i].Angle)) <= barHalfWidth + 2; // within the bar, give or take the ball's size
                         output.WriteLine($"ball {i} at {balls[i].Angle:0} deg reached the circle at {ms:0} ms; bar at {barAngle:0}: {(outcome[i] ? "blocked" : "missed")}");
                         continue;
                     }
@@ -270,8 +275,8 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
 
         Assert.True(outcome.Count >= 10, $"only {outcome.Count} balls reached the circle");
         int blocked = outcome.Values.Count(b => b);
-        output.WriteLine($"picture {pictureLagMs} ms behind{(redClouds ? ", red backdrop on the circle" : "")}{(centreOffPx != 0 ? $", centre {centreOffPx} px off" : "")}: blocked {blocked} of {outcome.Count}");
-        Assert.True(blocked >= outcome.Count * 0.8, $"blocked {blocked} of {outcome.Count}");
+        output.WriteLine($"picture {pictureLagMs} ms behind{(redClouds ? ", red backdrop on the circle" : "")}{(centreOffPx != 0 ? $", centre {centreOffPx} px off" : "")}{(barHalfWidth != 6 ? $", bar {2 * barHalfWidth:0} deg long turning {turnSpeed:0} deg/s" : "")}: blocked {blocked} of {outcome.Count}");
+        Assert.True(blocked >= outcome.Count * mustBlock, $"blocked {blocked} of {outcome.Count}");
         Assert.Equal(0, input.HeldCount); // nothing left held down
         if (redClouds)
         {
