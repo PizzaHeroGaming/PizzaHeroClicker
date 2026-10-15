@@ -282,35 +282,74 @@ public sealed class BarBlockDetector
     }
 
     /// <summary>
-    /// Which threat to steer to: of those the bar can get to before they escape (turning at
-    /// <paramref name="degreesPerSecond"/>), the most valuable, nearest escape first; if it can
-    /// reach none in time, the one that will escape soonest.
+    /// Which threat to steer to now. Several are usually in flight at once, so this plans: it tries
+    /// every order of dealing with them (the bar turning at <paramref name="degreesPerSecond"/>,
+    /// needing only its nearer end there, and waiting at each until it arrives), keeps the order that
+    /// blocks the most, and returns its first. "Most" weighs kinds by their place in the list, so a
+    /// more valuable one counts for more than a common one, but not for throwing away several easy
+    /// blocks to fetch it: the plan gets both if there is time. If nothing can be reached in time,
+    /// the one that will escape soonest is returned anyway.
     /// </summary>
     /// <param name="barAngle">Where the bar is now, if the caller knows better than the last picture.</param>
     /// <param name="current">
-    /// The one being steered for already. It is kept while it can still be reached and nothing more
-    /// valuable can be: switching back and forth between two equally good ones reaches neither.
+    /// The one being steered for already. Kept when another plan is only as good, so the bar does
+    /// not swap back and forth between equally good choices and reach neither.
     /// </param>
     public BarThreat? Choose(double degreesPerSecond, double? barAngle = null, BarThreat? current = null)
     {
         if (_threats.Count == 0) return null;
-        double? known = barAngle ?? BarAngle;
-        double bar = known ?? 0;
-        double Escape(BarThreat t) => t.SecondsToEscape;
-        // The bar only has to get its nearer end there, not its middle.
-        double halfWidth = Math.Max(0, BarWidthDegrees / 2 - EdgeMarginDegrees);
-        bool Reachable(BarThreat t) => known is null || Math.Max(0, Math.Abs(Wrap(t.Angle - bar)) - halfWidth) / Math.Max(1, degreesPerSecond) <= Escape(t);
+        double bar = barAngle ?? BarAngle ?? 0;
+        double speed = Math.Max(1, degreesPerSecond);
+        double reach = Math.Max(0, BarWidthDegrees / 2 - EdgeMarginDegrees); // the bar's nearer end does
+        // The soonest few: with more than this in flight, the later ones can wait for the next look.
+        var threats = _threats.OrderBy(t => t.SecondsToEscape).Take(MaxPlanned).ToList();
+        int kinds = Math.Max(1, _action.Targets.Count);
+        double Weight(BarThreat t) => Math.Pow(KindWeight, kinds - 1 - Math.Clamp(t.Target, 0, kinds - 1));
 
-        var reachable = _threats.Where(Reachable).ToList();
-        if (current is not null)
+        BarThreat? bestFirst = null;
+        double bestValue = -1, bestFinish = double.MaxValue;
+        var used = new bool[threats.Count];
+
+        void Search(int depth, double angle, double time, double value, BarThreat? first)
         {
-            var same = _threats.FirstOrDefault(t => t.Target == current.Target && Math.Abs(Wrap(t.Angle - current.Angle)) <= 6);
-            if (same is not null && (Reachable(same) || reachable.Count == 0) && !reachable.Any(t => t.Target < same.Target)) return same;
+            // Every order is scored as far as it goes: stopping early is one of the plans too.
+            // Better = blocks more; then, equally good, starts with what is already being chased;
+            // then finishes sooner.
+            if (first is not null)
+            {
+                int keeps = Same(first, current) ? 1 : 0, bestKeeps = Same(bestFirst, current) ? 1 : 0;
+                bool better = value > bestValue + 1e-9
+                    || (value > bestValue - 1e-9 && (keeps > bestKeeps || (keeps == bestKeeps && time < bestFinish)));
+                if (better) (bestValue, bestFinish, bestFirst) = (value, time, first);
+            }
+            if (depth == threats.Count) return;
+            for (int i = 0; i < threats.Count; i++)
+            {
+                if (used[i]) continue;
+                var t = threats[i];
+                double turn = Math.Max(0, Math.Abs(Wrap(t.Angle - angle)) - reach);
+                double arrive = time + turn / speed;
+                if (arrive > t.SecondsToEscape) continue; // cannot get there in time: not in this plan
+                // Got there: the bar now sits with the target just inside its near end, until it arrives.
+                double sitAt = turn <= 0 ? angle : t.Angle - Math.Sign(Wrap(t.Angle - angle)) * reach;
+                used[i] = true;
+                Search(depth + 1, sitAt, Math.Max(arrive, t.SecondsToEscape), value + Weight(t), first ?? t);
+                used[i] = false;
+            }
         }
-        if (reachable.Count > 0)
-            return reachable.OrderBy(t => t.Target).ThenBy(Escape).First();
-        return _threats.OrderBy(Escape).First();
+        Search(0, bar, 0, 0, null);
+
+        if (bestFirst is not null) return bestFirst;
+        return _threats.OrderBy(t => t.SecondsToEscape).First();
+
+        static bool Same(BarThreat? a, BarThreat? b) =>
+            a is not null && b is not null && a.Target == b.Target && Math.Abs(Wrap(a.Angle - b.Angle)) <= 6;
     }
+
+    /// <summary>At most this many threats are planned for at once (the soonest to escape).</summary>
+    private const int MaxPlanned = 6;
+    /// <summary>Each step up the list of kinds counts this many times as much as the one below it.</summary>
+    private const double KindWeight = 3;
 
     /// <summary>An angle difference brought into -180..180 degrees.</summary>
     public static double Wrap(double degrees)

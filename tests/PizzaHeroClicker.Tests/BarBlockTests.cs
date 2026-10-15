@@ -149,37 +149,57 @@ public class BarBlockDetectorTests
         Assert.Null(detector.BarAngle);
     }
 
-    [Fact]
-    public void SeesBallsByKindAndGoesForTheValuableOneItCanReach()
+    /// <summary>
+    /// Learns the backdrop with the bar at <paramref name="bar"/>, then shows two balls flying out at
+    /// 60 px a second and returns the detector as it stands after the last look.
+    /// </summary>
+    private static BarBlockDetector TwoBalls(double bar, (double Angle, double From, int Ring, int Middle) a, (double Angle, double From, int Ring, int Middle) b)
     {
         var detector = new BarBlockDetector(ShieldGame.Action());
         for (long ms = 0; ms <= 2200; ms += 100)
         {
             var still = ShieldGame.Backdrop();
-            ShieldGame.Bar(still, 0);
-            detector.Look(still, ms); // learn the backdrop
+            ShieldGame.Bar(still, bar);
+            detector.Look(still, ms);
         }
-
-        // A common (white and cyan) ball further out at 20 degrees, a yellow one at 300 degrees.
-        BarThreat? choice = null;
         for (long ms = 2300; ms <= 2600; ms += 30)
         {
             var frame = ShieldGame.Backdrop();
-            ShieldGame.Bar(frame, 0);
+            ShieldGame.Bar(frame, bar);
             double t = (ms - 2300) / 1000.0;
-            ShieldGame.Ball(frame, 20, 90 + 60 * t, ShieldGame.White, ShieldGame.Cyan);
-            ShieldGame.Ball(frame, 300, 60 + 60 * t, ShieldGame.Yellow, ShieldGame.White);
+            ShieldGame.Ball(frame, a.Angle, a.From + 60 * t, a.Ring, a.Middle);
+            ShieldGame.Ball(frame, b.Angle, b.From + 60 * t, b.Ring, b.Middle);
             detector.Look(frame, ms);
-            choice = detector.Choose(degreesPerSecond: 400);
         }
+        return detector;
+    }
+
+    [Fact]
+    public void SeesBallsByKind()
+    {
+        var detector = TwoBalls(0, (20, 72, ShieldGame.White, ShieldGame.Cyan), (300, 42, ShieldGame.Yellow, ShieldGame.White));
         Assert.Equal(2, detector.Threats.Count);
         Assert.Contains(detector.Threats, t => t.Target == 2 && Math.Abs(BarBlockDetector.Wrap(t.Angle - 300)) < 4); // yellow
         Assert.Contains(detector.Threats, t => t.Target == 3 && Math.Abs(BarBlockDetector.Wrap(t.Angle - 20)) < 4);  // cyan (white ring)
-        Assert.NotNull(choice);
-        Assert.Equal(2, choice!.Target); // the bar can reach either in time, so the more valuable yellow one
+    }
 
-        // Turning slowly it could only reach the near one in time: then that one.
-        Assert.Equal(3, detector.Choose(degreesPerSecond: 30)!.Target);
+    [Fact]
+    public void DoesNotDropAnEasyBlockToFetchAValuableOneThereIsTimeForAfterwards()
+    {
+        // As in a real game: the bar is right by a common ball about to arrive, and a more valuable
+        // one has just come out on the far side. Block the near one first, then go for the other.
+        var detector = TwoBalls(90, (95, 102, ShieldGame.White, ShieldGame.Cyan), (290, 32, ShieldGame.Yellow, ShieldGame.White));
+        var choice = detector.Choose(degreesPerSecond: 128);
+        Assert.Equal(3, choice!.Target);
+        Assert.InRange(Math.Abs(BarBlockDetector.Wrap(choice.Angle - 95)), 0, 4);
+    }
+
+    [Fact]
+    public void WhenOnlyOneCanBeHadTheValuableOneWins()
+    {
+        // Equally far either side of the bar and arriving together: there is time for one.
+        var detector = TwoBalls(110, (20, 82, ShieldGame.White, ShieldGame.Cyan), (200, 82, ShieldGame.Yellow, ShieldGame.White));
+        Assert.Equal(2, detector.Choose(degreesPerSecond: 128)!.Target);
     }
 }
 
@@ -196,19 +216,24 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
     // the 100 degrees it can turn while one flies, plus its half-length, from where the last one was),
     // so here it must block the ones it can reach.
     [InlineData(33, false, 0, 24, 150, 0.4)]
-    public void SteersTheBarInFrontOfTheBallsAndLetsGoOfTheKeysAtTheEnd(int pictureLagMs, bool redClouds, int centreOffPx = 0, double barHalfWidth = 6, double turnSpeed = 400, double mustBlock = 0.8)
+    // Shaped like a real game: a ball a second, each taking 3.4 s to arrive, so three or four are in
+    // flight at once; a slow bar; every fourth ball a more valuable kind. With these angles at most 9
+    // of the 12 can be reached; it must get close to that, and every valuable one.
+    [InlineData(33, false, 0, 6.5, 128, 0.65, 1000, 3400, 4)]
+    public void SteersTheBarInFrontOfTheBallsAndLetsGoOfTheKeysAtTheEnd(int pictureLagMs, bool redClouds, int centreOffPx = 0, double barHalfWidth = 6,
+        double turnSpeed = 400, double mustBlock = 0.8, int ballEveryMs = 700, int flightMs = 900, int valuableEvery = 0)
     {
         // A "shield" game run in real time: holding A turns the bar clockwise at 400 degrees a second,
         // D anticlockwise. A ball comes out of the middle every 0.7 s in a random direction and takes
         // 0.9 s to reach the bar's circle, so the bar can always get there in time if it sets off
         // promptly. Nothing tells the action which key does what: it finds out.
         double TurnSpeed = turnSpeed;
-        const double BallSpeed = ShieldGame.Radius / 0.9;
+        double BallSpeed = ShieldGame.Radius / (flightMs / 1000.0);
         var input = new FakeInput();
         var screen = new FakeScreen();
         var windows = new FakeWindows();
         var rng = new Random(7);
-        var balls = Enumerable.Range(0, 12).Select(i => (Born: 2500 + i * 700.0, Angle: rng.NextDouble() * 360)).ToList();
+        var balls = Enumerable.Range(0, 12).Select(i => (Born: 2500 + i * (double)ballEveryMs, Angle: rng.NextDouble() * 360, Valuable: valuableEvery > 0 && i % valuableEvery == 1)).ToList();
 
         object sync = new();
         double barAngle = 90, lastMs = 0;
@@ -254,7 +279,8 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
                         output.WriteLine($"ball {i} at {balls[i].Angle:0} deg reached the circle at {ms:0} ms; bar at {barAngle:0}: {(outcome[i] ? "blocked" : "missed")}");
                         continue;
                     }
-                    ShieldGame.Ball(frame, balls[i].Angle, distance, ShieldGame.White, ShieldGame.Cyan, centreOffPx, -centreOffPx / 2);
+                    if (balls[i].Valuable) ShieldGame.Ball(frame, balls[i].Angle, distance, ShieldGame.Yellow, ShieldGame.White, centreOffPx, -centreOffPx / 2);
+                    else ShieldGame.Ball(frame, balls[i].Angle, distance, ShieldGame.White, ShieldGame.Cyan, centreOffPx, -centreOffPx / 2);
                 }
                 return frame;
             }
@@ -268,15 +294,17 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
         engine.Stopped += (_, _) => finished.Set();
         var profile = new Profile { IntervalMs = 10, StartDelayMs = 0, CornerStop = false, Repeat = { Mode = RepeatMode.Loops, Count = 1 } };
         var action = ShieldGame.Action();
-        action.WatchForMs = 11_500;
+        action.WatchForMs = 2500 + 12 * ballEveryMs + flightMs;
         profile.Actions.Add(action);
         Assert.True(engine.Start(profile));
-        Assert.True(finished.Wait(20_000), "the run did not finish");
+        Assert.True(finished.Wait(40_000), "the run did not finish");
 
         Assert.True(outcome.Count >= 10, $"only {outcome.Count} balls reached the circle");
         int blocked = outcome.Values.Count(b => b);
-        output.WriteLine($"picture {pictureLagMs} ms behind{(redClouds ? ", red backdrop on the circle" : "")}{(centreOffPx != 0 ? $", centre {centreOffPx} px off" : "")}{(barHalfWidth != 6 ? $", bar {2 * barHalfWidth:0} deg long turning {turnSpeed:0} deg/s" : "")}: blocked {blocked} of {outcome.Count}");
+        output.WriteLine($"picture {pictureLagMs} ms behind{(redClouds ? ", red backdrop on the circle" : "")}{(centreOffPx != 0 ? $", centre {centreOffPx} px off" : "")}{(barHalfWidth != 6 ? $", bar {2 * barHalfWidth:0} deg long turning {turnSpeed:0} deg/s" : "")}{(flightMs != 900 ? $", a ball every {ballEveryMs} ms taking {flightMs} ms" : "")}: blocked {blocked} of {outcome.Count}");
         Assert.True(blocked >= outcome.Count * mustBlock, $"blocked {blocked} of {outcome.Count}");
+        var valuable = Enumerable.Range(0, balls.Count).Where(i => balls[i].Valuable && outcome.ContainsKey(i)).ToList();
+        Assert.True(valuable.All(i => outcome[i]), $"missed a valuable one: {string.Join(", ", valuable.Where(i => !outcome[i]))}");
         Assert.Equal(0, input.HeldCount); // nothing left held down
         if (redClouds)
         {

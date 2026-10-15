@@ -244,8 +244,10 @@ it to block them.
    ends half a second later. Or set **Keep steering for** to the game's length.
 
 While it runs it finds the bar on its circle and the things flying out (they are told apart from the
-busy backdrop by their movement, then by their colour), holds whichever key turns the bar towards
-the one to block, and lets go when it is lined up; close to the target it taps the key for exactly
+busy backdrop by their movement, then by their colour). With several in flight it plans the order to
+deal with them in, from how fast the bar turns, how long it is and when each will arrive, so it does
+not give up an easy block to fetch a valuable one it could have reached afterwards. It holds
+whichever key turns the bar towards the next one in the plan, and lets go when it is lined up; close to the target it taps the key for exactly
 the time the remaining turn takes. Keys are released when it pauses, stops or loses the game window.
 The first two seconds are spent learning the backdrop. If the backdrop has the bar's colour on parts
 of its circle (red clouds behind a red bar), the patches that stay put while the bar turns at the
