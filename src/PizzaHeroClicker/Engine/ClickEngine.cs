@@ -925,6 +925,29 @@ public sealed class ClickEngine : IDisposable
         var (bx, by, size) = a.LookBox;
         int[] pixels = [];
 
+        // Troubleshooting recorder: every look written down, and a picture of the circle each second.
+        var steerLog = _debugFolder is not null ? new StringBuilder() : null;
+        int steerPictures = 0;
+        long nextSteerPicture = 0;
+        void Note(string line)
+        {
+            if (steerLog is null || steerLog.Length > 2_000_000) return;
+            steerLog.Append($"{TimingEngine.TicksToMs(TimingEngine.Now - started),7:0} ms  {line}{Environment.NewLine}");
+        }
+        void Picture(string name)
+        {
+            if (_debugFolder is not { } folder || pixels.Length < size * size || !BeginDebugFiles(folder)) return;
+            var copy = (int[])pixels.Clone();
+            Task.Run(() =>
+            {
+                try { TemplateImage.SavePng(Path.Combine(folder, name), copy, size, size); }
+                catch (Exception ex) { Log.Error("Could not save a steering picture", ex); }
+            });
+        }
+        if (steerLog is not null)
+            Note($"Block with a bar: looking at ({bx}, {by}), {size} x {size}; centre ({a.CentreX}, {a.CentreY}), circle {a.Radius} px, bar colour {a.BarColor} +-{a.BarTolerance}; " +
+                 $"blocking {string.Join(", ", a.Targets.Select(t => $"{t.Color} +-{t.Tolerance}"))}. Angles: 0 = right, 90 = down (clockwise).");
+
         // What the action learns about the game at the start: which key turns the bar which way,
         // how fast, and how far behind the game the captured picture is.
         bool calibrated = false;
@@ -1023,6 +1046,9 @@ public sealed class ClickEngine : IDisposable
             int[] after = samples[^1].Bins;
             var (left, leftCount) = Shift(before, after);
             var (arrived, arrivedCount) = Shift(after, before);
+            Note($"calibration: held {a.ClockwiseKey.Display} {PressMs} ms; {samples.Count} looks; colour left {leftCount} px around {left:0} deg, arrived {arrivedCount} px around {arrived:0} deg; " +
+                 $"patches on the circle {detector.Patches}; before {Bins(before)}; after {Bins(after)}");
+            Picture("steer-calibrated.png");
             if (leftCount < BarBlockDetector.MinBarPixels || arrivedCount < BarBlockDetector.MinBarPixels)
             {
                 Log.Info($"Block: {a.ClockwiseKey.Display} did not visibly move the bar while it was held; assuming it turns clockwise, at about {degreesPerSecond:0} degrees a second." +
@@ -1044,6 +1070,10 @@ public sealed class ClickEngine : IDisposable
                          : " Other patches of the bar's colour are on its circle, and it did not move far enough to tell them apart." : ""));
             return true;
         }
+
+        // Where the bar's colour is round the circle, in 10-degree steps, for the recorder.
+        static string Bins(int[] bins) => string.Join(" ", Enumerable.Range(0, 36)
+            .Select(k => (k, n: bins.Skip(k * 10).Take(10).Sum())).Where(t => t.n > 0).Select(t => $"{t.k * 10}:{t.n}"));
 
         // Where some colour was in "from" but not in "to": its mean angle and how much of it.
         static (double Angle, int Count) Shift(int[] from, int[] to)
@@ -1086,7 +1116,19 @@ public sealed class ClickEngine : IDisposable
                 long lookedAt = TimingEngine.Now;
                 if (previousLook != 0) loopMs += (TimingEngine.TicksToMs(lookedAt - previousLook) - loopMs) * 0.2;
                 previousLook = lookedAt;
-                if (!Look(out var seen) || seen is not double bar)
+                bool looked = Look(out var seen);
+                if (looked && steerLog is not null)
+                {
+                    if (TimingEngine.Now >= nextSteerPicture && steerPictures < 40)
+                    {
+                        nextSteerPicture = TimingEngine.Now + TimingEngine.MsToTicks(1000);
+                        Picture($"steer-{++steerPictures:00}.png");
+                    }
+                    string threats = string.Join("; ", detector.Threats.Select(t => $"kind {t.Target + 1} at {t.Angle:0} deg, {t.Distance:0} px out, crosses in {t.SecondsToEscape:0.00} s"));
+                    Note($"bar {(seen is double sb ? $"{sb:0.0} deg ({detector.BarPixels} px)" : "NOT FOUND")}, patches {detector.Patches}, holding {(heldWay > 0 ? increaseKey.Display : heldWay < 0 ? decreaseKey.Display : "nothing")}{(detector.Learning ? ", still learning the backdrop" : "")}; " +
+                         (threats.Length > 0 ? "flying out: " + threats : "nothing flying out"));
+                }
+                if (!looked || seen is not double bar)
                 {
                     Hold(0); // cannot see the bar: do nothing rather than guess
                 }
@@ -1106,6 +1148,7 @@ public sealed class ClickEngine : IDisposable
                     else
                     {
                         double error = BarBlockDetector.Wrap(threat.Angle - barNow);
+                        Note($"  steering for kind {threat.Target + 1} at {threat.Angle:0} deg; bar now about {barNow:0} deg; {error:+0;-0} deg to go");
                         int way = Math.Sign(error);
                         double distance = Math.Abs(error);
                         if (distance <= a.AimToleranceDegrees)
@@ -1142,6 +1185,15 @@ public sealed class ClickEngine : IDisposable
         finally
         {
             Hold(0);
+            if (steerLog is { Length: > 0 } && _debugFolder is { } folder && BeginDebugFiles(folder))
+            {
+                string text = steerLog.ToString();
+                Task.Run(() =>
+                {
+                    try { lock (DebugFileLock) File.AppendAllText(Path.Combine(folder, "steer.txt"), text); }
+                    catch (Exception ex) { Log.Error("Could not write the steering log", ex); }
+                });
+            }
         }
         _t = TimingEngine.Now;
         return true;
@@ -1288,6 +1340,7 @@ public sealed class ClickEngine : IDisposable
         {
             foreach (string old in Directory.EnumerateFiles(folder, "*.png")) File.Delete(old);
             File.Delete(Path.Combine(folder, "looks.txt"));
+            File.Delete(Path.Combine(folder, "steer.txt"));
             File.WriteAllText(Path.Combine(folder, "report.txt"),
                 $"Area watch troubleshooting run, started {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss}{Environment.NewLine}");
             Log.Info($"Area watch troubleshooting snapshots are being saved to {folder}");

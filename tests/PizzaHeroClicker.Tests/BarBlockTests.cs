@@ -1,3 +1,4 @@
+using System.IO;
 using PizzaHeroClicker.Engine;
 using PizzaHeroClicker.Models;
 using PizzaHeroClicker.Services;
@@ -228,6 +229,8 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
 
         using var timing = new TimingEngine();
         using var engine = new ClickEngine(input, screen, windows, timing);
+        string recording = Path.Combine(Path.GetTempPath(), $"phc-steer-{Guid.NewGuid():N}");
+        if (redClouds) engine.AreaDebugFolder = recording; // the troubleshooting recorder, once
         using var finished = new ManualResetEventSlim();
         engine.Stopped += (_, _) => finished.Set();
         var profile = new Profile { IntervalMs = 10, StartDelayMs = 0, CornerStop = false, Repeat = { Mode = RepeatMode.Loops, Count = 1 } };
@@ -242,5 +245,15 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
         output.WriteLine($"picture {pictureLagMs} ms behind{(redClouds ? ", red backdrop on the circle" : "")}: blocked {blocked} of {outcome.Count}");
         Assert.True(blocked >= outcome.Count * 0.8, $"blocked {blocked} of {outcome.Count}");
         Assert.Equal(0, input.HeldCount); // nothing left held down
+        if (redClouds)
+        {
+            // The recorder wrote down every look, the calibration, and pictures of the circle.
+            for (int i = 0; i < 50 && !File.Exists(Path.Combine(recording, "steer.txt")); i++) Thread.Sleep(20);
+            string log = File.ReadAllText(Path.Combine(recording, "steer.txt"));
+            Assert.Contains("calibration: held A", log);
+            Assert.Contains("steering for kind 4", log);
+            Assert.True(Directory.GetFiles(recording, "steer-*.png").Length >= 5);
+            Directory.Delete(recording, recursive: true);
+        }
     }
 }

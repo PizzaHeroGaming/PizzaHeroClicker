@@ -35,9 +35,9 @@
       <Border Style="{StaticResource Card}">
         <StackPanel>
           <TextBlock Style="{StaticResource CardTitle}" Text="TROUBLESHOOTING" />
-          <CheckBox Content="Save what an Area watch sees while it runs" IsChecked="{Binding Settings.SaveAreaSnapshots}" />
+          <CheckBox Content="Save what an Area watch or Block action sees while it runs" IsChecked="{Binding Settings.SaveAreaSnapshots}" />
           <TextBlock Style="{StaticResource Hint}" Margin="28,4,0,8"
-                     Text="For working out why targets aren't being clicked. About once a second, for the first 40 seconds of a run, it saves a picture of the watched area and a note of what it recognised and clicked there, plus wider pictures (the area with a border around it) every few seconds and for eight seconds after the watch ends. A run that uses an Area watch replaces the previous recording. The pictures show whatever is on that part of your screen and stay on this PC. Turn it off when you are done." />
+                     Text="For working out why targets aren't being clicked or blocked. A Block action writes every look to steer.txt (where it thinks the bar is, what is flying out, which key it holds) and saves a picture of its circle each second. About once a second, for the first 40 seconds of a run, it saves a picture of the watched area and a note of what it recognised and clicked there, plus wider pictures (the area with a border around it) every few seconds and for eight seconds after the watch ends. A run that uses an Area watch replaces the previous recording. The pictures show whatever is on that part of your screen and stay on this PC. Turn it off when you are done." />
           <Button Content="OPEN SNAPSHOT FOLDER" Command="{Binding OpenDebugFolderCommand}" HorizontalAlignment="Left" Margin="28,0,0,0" />
         </StackPanel>
       </Border>
