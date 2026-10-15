@@ -31,8 +31,13 @@
     <!-- ===== Block with a bar ===== -->
     <DataTemplate DataType="{x:Type models:BarBlockAction}">
       <StackPanel>
-        <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,10"
-                   Text="For games where you steer a bar round a circle to block things flying out from the middle. Have the game showing, then pick the centre, then click right on the bar." />
+        <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,8"
+                   Text="For games where you steer a bar round a circle to block things flying out from the middle. While the game is on screen, press SET UP FROM A SNAPSHOT: the screen is frozen there and then, and you click the centre and the bar on the still picture, as slowly as you like." />
+        <StackPanel Style="{StaticResource Row}" Margin="0,0,0,12">
+          <Button Style="{StaticResource PrimaryButton}" Content="SET UP FROM A SNAPSHOT" Margin="0"
+                  Command="{Binding DataContext.SetUpFromSnapshotCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                  ToolTip="Press while the game is showing. The screen is photographed at once; then click the centre, then the bar, then (optionally) drag a box round the timer label for the start/stop marker, all on that still picture." />
+        </StackPanel>
         <StackPanel Style="{StaticResource Row}">
           <TextBlock Style="{StaticResource Lbl}" Text="Centre" />
           <TextBlock Style="{StaticResource Axis}" Text="X" />

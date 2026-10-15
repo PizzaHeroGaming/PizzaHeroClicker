@@ -35,7 +35,58 @@ public sealed class DialogService(ScreenService screen) : IDialogService
         ShowModal(new ActionEditorWindow(new ActionEditorViewModel(action, title, pickPoint, pickRegion, CaptureTargetPictureAsync, TestAreaWatchAsync, SnipMarkerAsync)
         {
             TestBar = TestBarBlockAsync,
+            SnapshotBar = SnapshotBarSetupAsync,
         })) == true;
+
+    /// <summary>
+    /// For games too quick to point at live: photographs the screen the moment it is called, then
+    /// asks for the centre and the bar on that still picture, and offers to snip a marker from it.
+    /// </summary>
+    public async Task<BarSnapshotSetup?> SnapshotBarSetupAsync()
+    {
+        const string title = "Set up from a snapshot";
+        List<PickResult>? picks = null;
+        Snip? marker = null;
+        bool photographed = false;
+        var hidden = await HideOwnWindowsAsync();
+        try
+        {
+            var (vx, vy, vw, vh) = ScreenService.VirtualScreen;
+            int[] frame = [];
+            photographed = vw > 0 && vh > 0 && screen.TryCapture(vx, vy, vw, vh, ref frame);
+            if (photographed) picks = await FrozenPointPicker.PickAsync(frame, vx, vy, vw, vh,
+                "click the CENTRE of the circle the bar goes round (where things fly out from).",
+                "click right ON THE BAR.");
+            if (picks is not null)
+                marker = await RegionPickerWindow.SnipFromAsync(frame, vx, vy, vw, vh,
+                    "Last, optional: drag a box round something that shows only while the game is on (such as its timer label) to use as the start/stop marker.   Esc skips this.");
+        }
+        finally
+        {
+            RestoreWindows(hidden);
+        }
+        if (!photographed)
+        {
+            Inform(title, "The screen could not be photographed.");
+            return null;
+        }
+        if (picks is not { Count: 2 }) return null;
+        if (CoordinateOrigin() is not var (ox, oy))
+        {
+            Inform(title, "The target window isn't open, so the positions can't be stored relative to it.");
+            return null;
+        }
+        (RegionPick, string)? markerPick = null;
+        if (marker is not null)
+        {
+            var (w, h) = (marker.Region.Width, marker.Region.Height);
+            if (w < ScreenAnchor.MinSide || h < ScreenAnchor.MinSide || w > ScreenAnchor.MaxSide || h > ScreenAnchor.MaxSide)
+                Inform(title, $"The marker box was {w} x {h} pixels, so it was not used. A marker should be between {ScreenAnchor.MinSide} and {ScreenAnchor.MaxSide} pixels each way: a label or an icon.");
+            else
+                markerPick = (marker.Region with { X = marker.Region.X - ox, Y = marker.Region.Y - oy }, TemplateImage.Encode(marker.Pixels, w, h));
+        }
+        return new BarSnapshotSetup(picks[0] with { X = picks[0].X - ox, Y = picks[0].Y - oy }, picks[1] with { X = picks[1].X - ox, Y = picks[1].Y - oy }, markerPick);
+    }
 
     /// <summary>
     /// Watches the bar's circle for about three seconds with a bar-block action's settings and

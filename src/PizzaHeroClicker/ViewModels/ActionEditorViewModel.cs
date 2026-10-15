@@ -20,6 +20,34 @@ public partial class ActionEditorViewModel : ObservableObject
     /// <summary>Looks at the screen with a bar-block action's settings and says what it sees. Set by the dialog host.</summary>
     public Func<BarBlockAction, Task>? TestBar { get; init; }
 
+    /// <summary>Freezes the screen and asks for the centre, the bar and a marker on the still picture. Set by the dialog host.</summary>
+    public Func<Task<BarSnapshotSetup?>>? SnapshotBar { get; init; }
+
+    [RelayCommand]
+    private async Task SetUpFromSnapshot()
+    {
+        if (IsPicking || Action is not BarBlockAction bar || SnapshotBar is null) return;
+        IsPicking = true;
+        try
+        {
+            if (await SnapshotBar() is not { } setup) return;
+            (bar.CentreX, bar.CentreY) = (setup.Centre.X, setup.Centre.Y);
+            bar.Radius = (int)Math.Round(Math.Sqrt(Math.Pow(setup.Bar.X - setup.Centre.X, 2) + Math.Pow(setup.Bar.Y - setup.Centre.Y, 2)));
+            bar.BarColor = setup.Bar.Color.ToHex();
+            bar.InnerRadius = Math.Min(bar.InnerRadius, Math.Max(0, bar.Radius - 20));
+            if (setup.Marker is var (region, image))
+            {
+                (bar.AnchorX, bar.AnchorY, bar.AnchorWidth, bar.AnchorHeight) = (region.X, region.Y, region.Width, region.Height);
+                bar.AnchorImage = image;
+            }
+            Error = "";
+        }
+        finally
+        {
+            IsPicking = false;
+        }
+    }
+
     [ObservableProperty] private string _error = "";
     [ObservableProperty] private bool _isPicking;
 

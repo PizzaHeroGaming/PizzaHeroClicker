@@ -8,6 +8,12 @@ public sealed record PickResult(int X, int Y, PixelColor Color);
 /// <summary>A rectangle dragged out on screen, in physical virtual-screen pixels.</summary>
 public sealed record RegionPick(int X, int Y, int Width, int Height);
 
+/// <summary>
+/// What was picked on one frozen snapshot of a bar-steering game: its centre, a point on the bar
+/// (with the bar's colour), and optionally a start/stop marker. In the profile's coordinates.
+/// </summary>
+public sealed record BarSnapshotSetup(PickResult Centre, PickResult Bar, (RegionPick Region, string Image)? Marker);
+
 /// <summary>Everything the view models need from the UI layer, so they never create windows themselves.</summary>
 public interface IDialogService
 {

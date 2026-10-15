@@ -86,7 +86,7 @@
         <StackPanel>
           <TextBlock Style="{StaticResource CardTitle}" Text="BLOCK THINGS WITH A BAR" />
           <TextBlock Style="{StaticResource Step}" Text="For games where things fly out from the middle of a circle and you turn a bar round it with two keys to block them." />
-          <TextBlock Style="{StaticResource Step}" Text="1.  With the game showing, add Block with a bar. PICK THE CENTRE, then PICK THE BAR by clicking right on it: that sets its circle and colour." />
+          <TextBlock Style="{StaticResource Step}" Text="1.  Add Block with a bar. While the game is on screen press SET UP FROM A SNAPSHOT: the screen freezes, and on the still picture you click the centre, then right on the bar (that sets its circle and colour), then optionally box the timer label as the marker." />
           <TextBlock Style="{StaticResource Step}" Text="2.  Set the two turn keys. Each run starts by holding the clockwise key briefly to learn which way each key turns the bar and how fast." />
           <TextBlock Style="{StaticResource Step}" Text="3.  List the colours to block, most valuable first (USE THE RADIATION COLOURS fills in the four radiation kinds). When there is time for only one, the highest in the list wins." />
           <TextBlock Style="{StaticResource Step}" Text="4.  TEST ON THE SCREEN NOW says whether it can see the bar and what is flying out. No keys are pressed." />

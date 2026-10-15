@@ -224,10 +224,13 @@ watch plays for that long, and the run stops.
 For "shield" mini games where things fly out from the middle of a circle and you turn a bar round
 it to block them, such as the Radiations game in Galaxy Idle Clicker.
 
-1. With the game showing, add **Block with a bar** on the Actions tab.
-2. **PICK THE CENTRE**: click the middle of the circle, where things fly out from.
-3. **PICK THE BAR**: click right on the bar. Its distance from the centre sets the circle, and the
-   colour under the click is what the bar is found by.
+1. Add **Block with a bar** on the Actions tab.
+2. While the game is on screen, press **SET UP FROM A SNAPSHOT**. The screen is photographed there
+   and then, and on that still picture you click the middle of the circle (where things fly out
+   from), then right on the bar, then optionally drag a box round the game's timer label for the
+   start/stop marker (Esc skips it). Take as long as you like: the game can end meanwhile. The bar's
+   distance from the centre sets its circle, and the colour under the click is what it is found by.
+   (**PICK THE CENTRE** and **PICK THE BAR** do the same on the live screen.)
 4. Set the two **Turn keys** (A and D by default). At the start of every run it holds the clockwise
    key for a fifth of a second and watches the bar, to learn which way each key really turns it,
    how fast, and how far behind the game the screen picture is.

@@ -127,7 +127,12 @@ public sealed class RegionPickerWindow : Window
         int[] frame = [];
         if (vw <= 0 || vh <= 0 || !screen.TryCapture(vx, vy, vw, vh, ref frame)) return null;
         onFrozen?.Invoke(frame, vx, vy, vw, vh);
+        return await SnipFromAsync(frame, vx, vy, vw, vh, hint);
+    }
 
+    /// <summary>As <see cref="SnipAsync"/>, on a photograph of the whole desktop taken earlier.</summary>
+    public static async Task<Snip?> SnipFromAsync(int[] frame, int vx, int vy, int vw, int vh, string hint)
+    {
         var still = BitmapSource.Create(vw, vh, 96, 96, PixelFormats.Bgr32, null, frame, vw * 4);
         still.Freeze();
         var window = new RegionPickerWindow(hint, still);
