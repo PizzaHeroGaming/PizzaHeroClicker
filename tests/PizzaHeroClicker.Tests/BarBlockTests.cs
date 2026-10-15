@@ -31,7 +31,7 @@ internal static class ShieldGame
     /// A busy backdrop with nothing in it that is white or yellow. With <paramref name="redClouds"/>,
     /// two patches of the bar's red lie on its circle, each bigger than the bar (as in the real game).
     /// </summary>
-    public static int[] Backdrop(bool redClouds = false)
+    public static int[] Backdrop(bool redClouds = false, bool solid = false)
     {
         var pixels = new int[Size * Size];
         for (int y = 0; y < Size; y++)
@@ -44,27 +44,27 @@ internal static class ShieldGame
             for (int r = Radius - 12; r <= Radius + 12; r++)
             {
                 int x = Centre + (int)Math.Round(r * Math.Cos(a * Math.PI / 180)), y = Centre + (int)Math.Round(r * Math.Sin(a * Math.PI / 180));
-                if ((x + y) % 3 != 0) pixels[y * Size + x] = 0xD84838; // a dull, speckled red, close enough to the bar's
+                if (solid || (x + y) % 3 != 0) pixels[y * Size + x] = solid ? 0xF03838 : 0xD84838; // red close enough to the bar's: speckled, or solid
             }
         }
         return pixels;
     }
 
-    public static void Bar(int[] pixels, double degrees)
+    public static void Bar(int[] pixels, double degrees, int offX = 0, int offY = 0)
     {
         for (double a = degrees - 6; a <= degrees + 6; a += 0.2)
         for (int r = Radius - 3; r <= Radius + 3; r++)
         {
-            int x = Centre + (int)Math.Round(r * Math.Cos(a * Math.PI / 180)), y = Centre + (int)Math.Round(r * Math.Sin(a * Math.PI / 180));
+            int x = Centre + offX + (int)Math.Round(r * Math.Cos(a * Math.PI / 180)), y = Centre + offY + (int)Math.Round(r * Math.Sin(a * Math.PI / 180));
             pixels[y * Size + x] = 0xF03232;
         }
     }
 
     /// <summary>A ball: a coloured ring round a lighter middle.</summary>
-    public static void Ball(int[] pixels, double degrees, double distance, int ring, int middle)
+    public static void Ball(int[] pixels, double degrees, double distance, int ring, int middle, int offX = 0, int offY = 0)
     {
-        int cx = Centre + (int)Math.Round(distance * Math.Cos(degrees * Math.PI / 180));
-        int cy = Centre + (int)Math.Round(distance * Math.Sin(degrees * Math.PI / 180));
+        int cx = Centre + offX + (int)Math.Round(distance * Math.Cos(degrees * Math.PI / 180));
+        int cy = Centre + offY + (int)Math.Round(distance * Math.Sin(degrees * Math.PI / 180));
         for (int y = cy - 11; y <= cy + 11; y++)
         for (int x = cx - 11; x <= cx + 11; x++)
         {
@@ -101,12 +101,12 @@ public class BarBlockDetectorTests
         detector.Look(first, 0);
         Assert.Equal(3, detector.Patches);                 // the bar and two backdrop patches
         Assert.NotEqual(90, Math.Round(detector.BarAngle!.Value)); // the biggest patch is not the bar: fooled, for now
-        int[] before = detector.RawBins;
+        bool[] before = detector.MatchSnapshot;
 
         var second = ShieldGame.Backdrop(redClouds: true);
         ShieldGame.Bar(second, 140);                        // the bar moved; the backdrop did not
         detector.Look(second, 50);
-        detector.LearnBackdrop(before, detector.RawBins);
+        detector.LearnBackdrop(before, detector.MatchSnapshot);
 
         var third = ShieldGame.Backdrop(redClouds: true);
         ShieldGame.Bar(third, 215);                         // even right on top of a backdrop patch
@@ -163,8 +163,9 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
     [InlineData(0, false)]
     [InlineData(33, false)] // the picture two frames behind the game, as a real screen capture can be
     [InlineData(66, false)] // four frames behind
-    [InlineData(33, true)]  // and with red backdrop on the bar's circle, bigger than the bar
-    public void SteersTheBarInFrontOfTheBallsAndLetsGoOfTheKeysAtTheEnd(int pictureLagMs, bool redClouds)
+    [InlineData(33, true)]  // and with red backdrop on the bar's circle, bigger than the bar, that hides it completely
+    [InlineData(33, false, 10)] // and with the centre clicked 10 px off the real one
+    public void SteersTheBarInFrontOfTheBallsAndLetsGoOfTheKeysAtTheEnd(int pictureLagMs, bool redClouds, int centreOffPx = 0)
     {
         // A "shield" game run in real time: holding A turns the bar clockwise at 400 degrees a second,
         // D anticlockwise. A ball comes out of the middle every 0.7 s in a random direction and takes
@@ -208,9 +209,9 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
             {
                 Advance();
                 double ms = lastMs;
-                var frame = ShieldGame.Backdrop(redClouds);
+                var frame = ShieldGame.Backdrop(redClouds, solid: true);
                 double shown = history.LastOrDefault(h => h.Ms <= ms - pictureLagMs, history[0]).Angle;
-                ShieldGame.Bar(frame, shown);
+                ShieldGame.Bar(frame, shown, centreOffPx, -centreOffPx / 2);
                 for (int i = 0; i < balls.Count; i++)
                 {
                     double distance = (ms - balls[i].Born) * BallSpeed / 1000;
@@ -221,7 +222,7 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
                         output.WriteLine($"ball {i} at {balls[i].Angle:0} deg reached the circle at {ms:0} ms; bar at {barAngle:0}: {(outcome[i] ? "blocked" : "missed")}");
                         continue;
                     }
-                    ShieldGame.Ball(frame, balls[i].Angle, distance, ShieldGame.White, ShieldGame.Cyan);
+                    ShieldGame.Ball(frame, balls[i].Angle, distance, ShieldGame.White, ShieldGame.Cyan, centreOffPx, -centreOffPx / 2);
                 }
                 return frame;
             }
@@ -242,7 +243,7 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
 
         Assert.True(outcome.Count >= 10, $"only {outcome.Count} balls reached the circle");
         int blocked = outcome.Values.Count(b => b);
-        output.WriteLine($"picture {pictureLagMs} ms behind{(redClouds ? ", red backdrop on the circle" : "")}: blocked {blocked} of {outcome.Count}");
+        output.WriteLine($"picture {pictureLagMs} ms behind{(redClouds ? ", red backdrop on the circle" : "")}{(centreOffPx != 0 ? $", centre {centreOffPx} px off" : "")}: blocked {blocked} of {outcome.Count}");
         Assert.True(blocked >= outcome.Count * 0.8, $"blocked {blocked} of {outcome.Count}");
         Assert.Equal(0, input.HeldCount); // nothing left held down
         if (redClouds)

@@ -25,8 +25,11 @@ public sealed class BarBlockDetector
     private readonly TargetTracker _tracker = new();
     private readonly List<(int X, int Y)> _seen = new();
 
-    /// <summary>How far either side of the circle the bar's pixels are looked for.</summary>
-    private const int BarBand = 22;
+    /// <summary>
+    /// How far either side of the circle the bar's pixels are looked for. Generous: the centre is
+    /// clicked by hand and can easily be ten or twenty pixels off the true one.
+    /// </summary>
+    private const int BarBand = 40;
     /// <summary>Fewer matching pixels than this on the circle and the bar is not considered found.</summary>
     public const int MinBarPixels = 30;
 
@@ -52,6 +55,7 @@ public sealed class BarBlockDetector
             band.Add((py * _size + px, bin));
         }
         _barBand = band.ToArray();
+        _match = new bool[_barBand.Length];
 
         _blobs.Markers = action.Targets
             .Select(t => new AreaColorRule(PixelColor.TryParse(t.Color, out var tc) ? tc : new PixelColor(255, 255, 255), t.Tolerance))
@@ -79,17 +83,33 @@ public sealed class BarBlockDetector
     private void FindBar(int[] pixels)
     {
         Array.Clear(_raw);
+        Array.Clear(_counted);
         int tol = _action.BarTolerance;
-        foreach (var (offset, bin) in _barBand)
+        for (int i = 0; i < _barBand.Length; i++)
         {
+            var (offset, bin) = _barBand[i];
             int p = pixels[offset];
-            if (Math.Abs(((p >> 16) & 0xFF) - _barColour.R) <= tol
+            bool match = Math.Abs(((p >> 16) & 0xFF) - _barColour.R) <= tol
                 && Math.Abs(((p >> 8) & 0xFF) - _barColour.G) <= tol
-                && Math.Abs((p & 0xFF) - _barColour.B) <= tol) _raw[bin]++;
+                && Math.Abs((p & 0xFF) - _barColour.B) <= tol;
+            _match[i] = match;
+            if (!match) continue;
+            _raw[bin]++;
+            // A pixel the backdrop itself has in the bar's colour says nothing about the bar.
+            if (_static is null || !_static[i]) _counted[bin]++;
         }
         Patches = CountPatches(_raw);
-        (BarAngle, BarPixels) = Locate(_raw, BarAngle);
+        (BarAngle, BarPixels) = Locate(_counted, BarAngle ?? ExpectedAngle);
     }
+
+    /// <summary>
+    /// Where the bar should be, worked out by the caller from the keys it has pressed. Used to pick
+    /// the right patch of colour after the bar has been out of sight for a moment.
+    /// </summary>
+    public double? ExpectedAngle { get; set; }
+
+    /// <summary>For every pixel of the band round the circle, whether it had the bar's colour at the last look.</summary>
+    public bool[] MatchSnapshot => (bool[])_match.Clone();
 
     /// <summary>
     /// Pixel counts of the bar's colour round its circle, one per degree, as last seen (before any
@@ -104,25 +124,26 @@ public sealed class BarBlockDetector
     public int Patches { get; private set; }
 
     /// <summary>True once the backdrop's patches of the bar's colour are known and taken off.</summary>
-    public bool KnowsBackdrop => _background is not null;
+    public bool KnowsBackdrop => _static is not null;
 
     /// <summary>
     /// The backdrop may carry the bar's colour on parts of the circle (red clouds behind a red
-    /// bar). Given the counts with the bar in two places far enough apart, whatever was there both
-    /// times is backdrop, and is taken off every look from now on, leaving only the bar.
+    /// bar). Given which pixels had the bar's colour with the bar in two places far enough apart,
+    /// the pixels that had it both times are backdrop, and are left out from now on. Pixel by
+    /// pixel, so that the bar passing over such a patch is still seen by the rest of its pixels.
     /// </summary>
-    public void LearnBackdrop(int[] before, int[] after)
+    public void LearnBackdrop(bool[] before, bool[] after)
     {
-        _background = new int[360];
-        for (int i = 0; i < 360; i++) _background[i] = Math.Min(before[i], after[i]);
+        if (before.Length != _match.Length || after.Length != _match.Length) return;
+        _static = new bool[_match.Length];
+        for (int i = 0; i < _static.Length; i++) _static[i] = before[i] && after[i];
         BarAngle = null; // found afresh, now without the backdrop
     }
 
-    /// <summary>Where the bar is in a set of counts, with the backdrop taken off: the run nearest <paramref name="near"/>, otherwise the biggest.</summary>
-    public (double? Angle, int Pixels) Locate(int[] raw, double? near)
+    /// <summary>Where the bar is in a set of counts: the run nearest <paramref name="near"/>, otherwise the biggest.</summary>
+    private (double? Angle, int Pixels) Locate(int[] counts, double? near)
     {
-        for (int i = 0; i < 360; i++)
-            _bins[i] = _background is null ? raw[i] : Math.Max(0, raw[i] - _background[i] - BackdropSlack);
+        Array.Copy(counts, _bins, 360);
         (double Angle, int Count)? best = null;
         double bestScore = double.MaxValue;
         foreach (var run in Runs())
@@ -143,8 +164,9 @@ public sealed class BarBlockDetector
 
     /// <summary>Changes this small in a degree's count are noise, not the bar.</summary>
     public const int BackdropSlack = 2;
-    private readonly int[] _raw = new int[360];
-    private int[]? _background;
+    private readonly int[] _raw = new int[360], _counted = new int[360];
+    private readonly bool[] _match;
+    private bool[]? _static;
 
     /// <summary>Runs of non-empty 1-degree bins (allowing one-bin gaps, and wrapping past 360), with their mean angle.</summary>
     private IEnumerable<(double Angle, int Count)> Runs()

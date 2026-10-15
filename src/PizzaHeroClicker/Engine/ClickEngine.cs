@@ -907,6 +907,7 @@ public sealed class ClickEngine : IDisposable
     // ------------------------------------------------------------------ steering a bar to block things
 
     private int _releasedAll; // counts the times Housekeeping let go of every key, so a holder knows its key is up
+    private const double UnseenBarMs = 1500;   // how long to steer by reckoning alone while the bar cannot be seen
 
     /// <summary>
     /// Steers a bar round its circle to block what flies out from the centre (see <see cref="BarBlockAction"/>).
@@ -952,6 +953,8 @@ public sealed class ClickEngine : IDisposable
         // how fast, and how far behind the game the captured picture is.
         bool calibrated = false;
         double degreesPerSecond = 180, pictureLagMs = 30;
+        double? lastBar = null;          // the bar's angle when last seen
+        long lastBarSeenAt = 0;
         KeyCombo increaseKey = a.ClockwiseKey, decreaseKey = a.AnticlockwiseKey; // screen angles grow clockwise
         double loopMs = a.PollMs;   // how long one look-and-decide takes, on average
         long previousLook = 0;
@@ -1017,6 +1020,7 @@ public sealed class ClickEngine : IDisposable
         {
             const double PressMs = 200, WatchMs = 350;
             int[] before = detector.RawBins;
+            bool[] beforeMatch = detector.MatchSnapshot;
             var samples = new List<(double Ms, int[] Bins)>();
             _input.KeyComboDown(a.ClockwiseKey);
             long down = TimingEngine.Now;
@@ -1062,7 +1066,7 @@ public sealed class ClickEngine : IDisposable
             int firstMoved = samples.FindIndex(p => Shift(before, p.Bins).Count >= leftCount * 0.25);
             if (firstMoved >= 0) pictureLagMs = Math.Clamp(samples[firstMoved].Ms - 0.25 * 10 / degreesPerSecond * 1000, 0, 200);
             bool learned = Math.Abs(turned) >= 12; // moved clear of where it was: what stayed is backdrop
-            if (learned) detector.LearnBackdrop(before, after);
+            if (learned) detector.LearnBackdrop(beforeMatch, detector.MatchSnapshot);
             Log.Info($"Block: {a.ClockwiseKey.Display} turns the bar {(turned > 0 ? "clockwise" : "anticlockwise")} at about {degreesPerSecond:0} degrees a second; " +
                      $"the picture shows it about {pictureLagMs:0} ms after the key goes down." +
                      (detector.Patches > 1 ? learned
@@ -1128,7 +1132,22 @@ public sealed class ClickEngine : IDisposable
                     Note($"bar {(seen is double sb ? $"{sb:0.0} deg ({detector.BarPixels} px)" : "NOT FOUND")}, patches {detector.Patches}, holding {(heldWay > 0 ? increaseKey.Display : heldWay < 0 ? decreaseKey.Display : "nothing")}{(detector.Learning ? ", still learning the backdrop" : "")}; " +
                          (threats.Length > 0 ? "flying out: " + threats : "nothing flying out"));
                 }
-                if (!looked || seen is not double bar)
+                // Where the bar is now: as seen (a moment ago) plus the turning asked for since. If it
+                // cannot be seen (passing over backdrop of its own colour, say), from where it was last
+                // seen plus every turn asked for since, for a while: steering on is how it gets clear.
+                double? estimate = null;
+                if (looked && seen is double bar)
+                {
+                    (lastBar, lastBarSeenAt) = (bar, lookedAt);
+                    estimate = bar + TurnedSince(lookedAt - TimingEngine.MsToTicks(pictureLagMs));
+                }
+                else if (calibrated && lastBar is double last && TimingEngine.TicksToMs(lookedAt - lastBarSeenAt) < UnseenBarMs)
+                {
+                    estimate = last + TurnedSince(lastBarSeenAt - TimingEngine.MsToTicks(pictureLagMs));
+                }
+                detector.ExpectedAngle = estimate is double e ? (e % 360 + 360) % 360 : null;
+
+                if (estimate is not double barNow)
                 {
                     Hold(0); // cannot see the bar: do nothing rather than guess
                 }
@@ -1139,8 +1158,6 @@ public sealed class ClickEngine : IDisposable
                 }
                 else
                 {
-                    // The picture shows the bar a moment ago; add the turning asked for since then.
-                    double barNow = bar + TurnedSince(lookedAt - TimingEngine.MsToTicks(pictureLagMs));
                     if (detector.Choose(degreesPerSecond) is not { } threat)
                     {
                         Hold(0); // nothing coming: stay put

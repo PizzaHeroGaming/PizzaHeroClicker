@@ -34,6 +34,7 @@ public partial class ActionEditorViewModel : ObservableObject
             (bar.CentreX, bar.CentreY) = (setup.Centre.X, setup.Centre.Y);
             bar.Radius = (int)Math.Round(Math.Sqrt(Math.Pow(setup.Bar.X - setup.Centre.X, 2) + Math.Pow(setup.Bar.Y - setup.Centre.Y, 2)));
             bar.BarColor = setup.Bar.Color.ToHex();
+            bar.BarTolerance = 40;
             bar.InnerRadius = Math.Min(bar.InnerRadius, Math.Max(0, bar.Radius - 20));
             if (setup.Targets.Count > 0)
             {
@@ -169,6 +170,7 @@ public partial class ActionEditorViewModel : ObservableObject
                     }
                     a.Radius = (int)Math.Round(Math.Sqrt(Math.Pow(pick.X - a.CentreX, 2) + Math.Pow(pick.Y - a.CentreY, 2)));
                     a.BarColor = pick.Color.ToHex();
+                    a.BarTolerance = 40; // a game's backdrop often has shades near the bar's colour
                     a.InnerRadius = Math.Min(a.InnerRadius, Math.Max(0, a.Radius - 20));
                     break;
                 case BarBlockAction a: // the eyedropper adds something to block, by its colour

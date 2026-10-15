@@ -44,7 +44,7 @@ public partial class BarBlockAction : ActionBase, IHasMarker
     [ObservableProperty] private int _radius = 300;
     /// <summary>The bar's colour, "#RRGGBB", and how far its pixels may differ from it.</summary>
     [ObservableProperty] private string _barColor = "#F03232";
-    [ObservableProperty] private int _barTolerance = 60;
+    [ObservableProperty] private int _barTolerance = 40;
     /// <summary>Things nearer the centre than this are not chased yet (where they come out is often busy).</summary>
     [ObservableProperty] private int _innerRadius = 40;
 
@@ -88,7 +88,7 @@ public partial class BarBlockAction : ActionBase, IHasMarker
 
     /// <summary>The square of screen the action looks at: the bar's whole circle plus a margin.</summary>
     public (int X, int Y, int Size) LookBox => (CentreX - Radius - LookMargin, CentreY - Radius - LookMargin, 2 * (Radius + LookMargin));
-    public const int LookMargin = 40;
+    public const int LookMargin = 50;
 
     public override IEnumerable<(int X, int Y)> GetPoints() => [(CentreX, CentreY), (CentreX + Radius, CentreY)];
 
