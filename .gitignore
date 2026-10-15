@@ -27,3 +27,6 @@ Desktop.ini
 # Installer build output
 /installer/output/
 /installer/staging/
+
+# Profiles made for one person to import; not part of the app
+/profiles-to-import/
