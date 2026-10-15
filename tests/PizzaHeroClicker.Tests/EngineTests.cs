@@ -526,6 +526,66 @@ public class ClickEngineTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void AMarkerHiddenByATargetDoesNotEndTheGameButTheShopDoes()
+    {
+        // The marker (a score label at 500, 20) is covered for a second by something flying over it
+        // while the game carries on: clicking must carry on too. Later the game ends: the label goes
+        // and the area becomes a shop full of target-like pictures. Then clicking stops at once and
+        // the watch ends.
+        const int W = 200, H = 100;
+        var picture = new int[24 * 24];
+        for (int y = 4; y < 20; y++)
+        for (int x = 4; x < 20; x++)
+            picture[y * 24 + x] = 0xE08020;
+        var label = new int[20 * 10];
+        for (int i = 0; i < label.Length; i++) label[i] = i % 3 == 0 ? 0xFFFFFF : 0x202020;
+        var covered = new int[20 * 10];
+        Array.Fill(covered, 0xFF0000);                        // a red-ringed satellite in front of it
+
+        long start = TimingEngine.Now;
+        double Ms() => TimingEngine.TicksToMs(TimingEngine.Now - start);
+        bool Shop() => Ms() >= 3500;
+        _screen.Capture = (x0, y0, w, h) =>
+        {
+            if ((w, h) == (20, 10) && x0 == 500 && y0 == 20)
+                return Shop() ? new int[w * h] : Ms() is >= 2000 and < 3000 ? (int[])covered.Clone() : (int[])label.Clone();
+            var frame = new int[w * h];
+            if (w != W) return frame;                          // the marker search round its spot: nothing extra there
+            if (Shop())
+            {
+                Array.Fill(frame, 0x707070);
+                for (int k = 0; k < 4; k++)
+                for (int y = 40; y < 56; y++)
+                for (int x = 20 + k * 45; x < 36 + k * 45; x++)
+                    frame[y * w + x] = 0xE08020;               // shop items that look like targets
+                return frame;
+            }
+            int cx = 30 + (int)(Ms() * 0.03) % 140;            // a target drifting across
+            for (int y = 42; y < 58; y++)
+            for (int x = cx - 8; x < cx + 8; x++)
+                frame[y * w + x] = 0xE08020;
+            return frame;
+        };
+        var clickTimes = new List<double>();
+        _input.Clicked = (_, _, _) => clickTimes.Add(Ms());
+
+        var profile = Plain(10, 1);
+        profile.Repeat.Mode = RepeatMode.Loops;
+        profile.Actions.Add(new AreaWatchAction
+        {
+            X = 100, Y = 100, Width = W, Height = H, PollMs = 10, RetargetDelayMs = 100, LeadMovingTargets = false, WatchForMs = 8000,
+            AnchorImage = TemplateImage.Encode(label, 20, 10), AnchorX = 500, AnchorY = 20, AnchorWidth = 20, AnchorHeight = 10,
+            Rules = { new AreaRule { Image = TemplateImage.Encode(picture, 24, 24), MatchPercent = 55, Button = ClickButton.Left } },
+        });
+        Assert.Equal(StopReason.Completed, Run(profile).Reason);
+        double ended = Ms();
+
+        Assert.Contains(clickTimes, t => t is > 2200 and < 2900);          // still clicking while the label was covered
+        Assert.DoesNotContain(clickTimes, t => t > 3510);                  // nothing on the shop
+        Assert.InRange(ended, 3500, 4600);                                 // and the watch ended soon after, not at 8 s
+    }
+
+    [Fact]
     public void AMarkerStartsTheWatchWhenItAppearsAndEndsItWhenItGoes()
     {
         // The area always has a target. The marker (a 20 x 10 label at 500, 20) decides when clicking happens.

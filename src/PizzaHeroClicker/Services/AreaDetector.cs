@@ -189,6 +189,12 @@ public sealed class AreaDetector
         return comparable && changed > cells * ScreenMovingShare;
     }
 
+    /// <summary>
+    /// True once this watch knows what its screen looks like and checks every look against it
+    /// (pictures in use, scene learned). Only then can it tell a covered marker from a game that ended.
+    /// </summary>
+    public bool KnowsItsScreen => _appearance.Count > 0 && _scene.Ready;
+
     /// <summary>True when the last frame showed a different screen from the one learned, so nothing was offered.</summary>
     public bool IsScreenChanged { get; private set; }
 

@@ -89,6 +89,7 @@ public sealed class ClickEngine : IDisposable
     private const double AnchorSearchEveryMs = 400;
     private int[] _anchorPixels = [];
     private const double AnchorCheckMs = 100;   // how often the marker is looked at while there is nothing to click
+    private const double AnchorCoveredMs = 3000; // a marker hidden while the game screen is still there: at most this long
     private const double AnchorGraceMs = 500;   // the marker must be gone this long before the watch ENDS
                                                 // (clicking stops the instant it goes; see DoAreaWatch)
     private readonly List<(int X, int Y, long At)> _recentAreaClicks = new();        // spots to leave alone for a moment
@@ -711,6 +712,7 @@ public sealed class ClickEngine : IDisposable
             }
         }
         long anchorLastSeen = TimingEngine.Now, anchorNextCheck = 0;
+        bool gameStillShowing = false; // the last look found the learned game screen, unchanged and still
 
         // "Keep watching for": stay on this action, target after target, until this moment. 0 = no time limit
         // (one target only, unless a marker decides when the watch ends).
@@ -728,12 +730,24 @@ public sealed class ClickEngine : IDisposable
             if (anchor is not null && TimingEngine.Now >= anchorNextCheck)
             {
                 anchorNextCheck = TimingEngine.Now + TimingEngine.MsToTicks(AnchorCheckMs);
-                if (AnchorShowing(a, anchor)) anchorLastSeen = TimingEngine.Now;
-                else if (TimingEngine.Now - anchorLastSeen >= TimingEngine.MsToTicks(AnchorGraceMs))
+                if (AnchorShowing(a, anchor))
                 {
-                    _t = TimingEngine.Now; // the marker has gone: that screen is over
-                    RecordWatchEnd(a);
-                    return true;
+                    anchorLastSeen = TimingEngine.Now;
+                }
+                else
+                {
+                    // Gone, or only hidden? Something flying in front of the marker (a satellite over
+                    // the score label) hides it while the game carries on underneath. When the watch
+                    // can see its game screen is still there, unchanged and not moving, the marker is
+                    // only covered: keep going for a while. When the game has really ended, the screen
+                    // changes too, and the watch ends as quickly as before.
+                    double goneMs = TimingEngine.TicksToMs(TimingEngine.Now - anchorLastSeen);
+                    if ((goneMs >= AnchorGraceMs && !gameStillShowing) || goneMs >= AnchorCoveredMs)
+                    {
+                        _t = TimingEngine.Now; // the marker has gone: that screen is over
+                        RecordWatchEnd(a);
+                        return true;
+                    }
                 }
             }
 
@@ -751,6 +765,7 @@ public sealed class ClickEngine : IDisposable
             foreach (var c in _recentAreaClicks) _avoid.Add((c.X, c.Y));
 
             var found = captured ? detector.Find(_areaPixels, -1, _avoid) : null;
+            gameStillShowing = captured && detector.KnowsItsScreen && !detector.IsScreenChanged;
             // A spot just clicked stays off-limits for as long as something is still sitting right
             // there: a destroyed target's explosion can outlast "leave that spot alone", and a click
             // on it is wasted (and may count as a miss). A missed target moves off and is free again.
@@ -795,7 +810,10 @@ public sealed class ClickEngine : IDisposable
                 // moment, so that something drifting across the marker does not end it early.
                 if (anchor is not null)
                 {
-                    if (!AnchorShowing(a, anchor, search: false))
+                    // A covered marker does not stop the click while this very look found the game
+                    // screen intact (see the ending rule above); anything else does.
+                    bool covered = gameStillShowing && TimingEngine.TicksToMs(TimingEngine.Now - anchorLastSeen) < AnchorCoveredMs;
+                    if (!AnchorShowing(a, anchor, search: false) && !covered)
                     {
                         anchorNextCheck = 0; // re-check at the top of the loop, which also handles ending
                         _t = TimingEngine.Now;
@@ -917,8 +935,9 @@ public sealed class ClickEngine : IDisposable
             return false;
 
         var shift = (fx - AnchorSearchPx, fy - AnchorSearchPx);
-        _anchorShift[a] = shift;
         _markerMatch = (int)(share * 100);
+        if (shift == (sx, sy)) return true; // where it was all along: it had just not quite appeared at the first look
+        _anchorShift[a] = shift;
         Log.Info($"Found the start/stop marker {Math.Abs(shift.Item1)} px {(shift.Item1 < 0 ? "left" : "right")} and {Math.Abs(shift.Item2)} px {(shift.Item2 < 0 ? "up" : "down")} " +
                  $"from where it was snipped ({share:P0} alike). The game window has probably moved; the watched area is moved with it for this run.");
         return true;

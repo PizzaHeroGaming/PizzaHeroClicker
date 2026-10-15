@@ -181,6 +181,10 @@ watch plays for that long, and the run stops.
   for** to 0, or leave a number there as an upper limit. Choose something that vanishes the moment
   the game ends and that targets don't fly across; the status shows `WAITING FOR MARKER (62%)`, with how alike the spot is right now, until it
   appears.
+- Something flying in front of the marker (a satellite over a score label) does not end the
+  watch: while the watch can see its game screen is still there, unchanged and not moving, it
+  treats the marker as covered and carries on for up to 3 seconds. When the game really ends,
+  the screen changes as well, and the watch stops as quickly as before.
 - If the game window has been nudged since the marker was snipped, the marker is looked for up to
   40 px from its spot. When it is found there, the watched area moves by the same amount for that
   run, and the log says how far it was off. For a window that moves a lot, turn on
