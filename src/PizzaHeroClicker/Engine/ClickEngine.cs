@@ -127,6 +127,11 @@ public sealed class ClickEngine : IDisposable
     private volatile int _debugRun;     // changes whenever a new recording starts
     private bool _debugFilesStarted;    // this run has replaced the previous run's files
     private readonly StringBuilder _debugLooks = new(); // looks.txt: time (ms) then every candidate's screen position
+    // Close-ups round each click: "a" from the look that found the target, "b" a moment after the click.
+    private const int MaxCloseUps = 150, CloseUpRadius = 70;
+    private const double CloseUpAfterMs = 150;
+    private int _debugCloseUps;
+    private readonly List<(int N, int SeenX, int SeenY, int ClickX, int ClickY, long Due)> _closeUpsDue = new();
     private int _markerSnapshots;
     private long _markerSnapshotNextAt;
     private int _debugCount;
@@ -771,6 +776,16 @@ public sealed class ClickEngine : IDisposable
             }
             _differentScreen = captured && detector.IsScreenChanged;
             if (record) SaveDebugSnapshot(a, detector);
+            if (captured && _closeUpsDue.Count > 0)
+            {
+                for (int i = _closeUpsDue.Count - 1; i >= 0; i--)
+                {
+                    var c = _closeUpsDue[i];
+                    if (TimingEngine.Now < c.Due) continue;
+                    SaveCloseUp($"click-{c.N:000}-b.png", _areaPixels, a.Width, a.Height, c.SeenX, c.SeenY, c.ClickX, c.ClickY);
+                    _closeUpsDue.RemoveAt(i);
+                }
+            }
             if (found is var (x, y, rule))
             {
                 // The marker is looked at again immediately before every click. When the game's
@@ -805,7 +820,16 @@ public sealed class ClickEngine : IDisposable
                     string aim = (x, y) == (seenX, seenY)
                         ? (vx, vy) == (0, 0) ? "" : "  (moving, not aimed ahead)"
                         : $"  (seen at ({a.X + sx + seenX}, {a.Y + sy + seenY}), moving {Math.Sqrt(vx * vx + vy * vy):0} px/s, aimed {x - seenX:+0;-0}, {y - seenY:+0;-0} ahead)";
-                    _debugClicks.Append($"  {at:0.00} s  {a.Rules[rule].Button.ToString().ToLowerInvariant()}-click at ({a.X + sx + x}, {a.Y + sy + y}) for rule {rule + 1}{aim}{Environment.NewLine}");
+                    string closeUp = "";
+                    if (_debugCloseUps < MaxCloseUps)
+                    {
+                        // What was there when it was seen, and a moment after the click: did it die or fly on?
+                        int n = ++_debugCloseUps;
+                        SaveCloseUp($"click-{n:000}-a.png", _areaPixels, a.Width, a.Height, seenX, seenY, x, y);
+                        _closeUpsDue.Add((n, seenX, seenY, x, y, TimingEngine.Now + TimingEngine.MsToTicks(CloseUpAfterMs)));
+                        closeUp = $"  [click-{n:000}]";
+                    }
+                    _debugClicks.Append($"  {at:0.00} s  {a.Rules[rule].Button.ToString().ToLowerInvariant()}-click at ({a.X + sx + x}, {a.Y + sy + y}) for rule {rule + 1}{aim}{closeUp}{Environment.NewLine}");
                 }
                 if (!keepWatching) return true;
 
@@ -940,6 +964,44 @@ public sealed class ClickEngine : IDisposable
     }
 
     /// <summary>
+    /// A small picture centred on where a target was seen, with the click marked by a magenta cross,
+    /// written in the background.
+    /// </summary>
+    private void SaveCloseUp(string name, int[] frame, int width, int height, int cx, int cy, int markX, int markY)
+    {
+        if (_debugFolder is not { } folder || !BeginDebugFiles(folder)) return;
+        const int r = CloseUpRadius, size = 2 * r;
+        var pixels = new int[size * size];
+        for (int y = 0; y < size; y++)
+        {
+            int fy = cy - r + y;
+            if (fy < 0 || fy >= height) continue;
+            for (int x = 0; x < size; x++)
+            {
+                int fx = cx - r + x;
+                if (fx >= 0 && fx < width) pixels[y * size + x] = frame[fy * width + fx];
+            }
+        }
+        int mx = markX - cx + r, my = markY - cy + r;
+        for (int d = -6; d <= 6; d++)
+        {
+            if (mx + d >= 0 && mx + d < size && my >= 0 && my < size) pixels[my * size + mx + d] = 0xFF00FF;
+            if (my + d >= 0 && my + d < size && mx >= 0 && mx < size) pixels[(my + d) * size + mx] = 0xFF00FF;
+        }
+        Task.Run(() =>
+        {
+            try
+            {
+                TemplateImage.SavePng(Path.Combine(folder, name), pixels, size, size);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Could not save a click close-up", ex);
+            }
+        });
+    }
+
+    /// <summary>
     /// The first time a run writes anything, the previous run's recording makes way. Done lazily so
     /// a run that never reaches an area watch does not wipe the last useful recording.
     /// </summary>
@@ -970,6 +1032,8 @@ public sealed class ClickEngine : IDisposable
         _debugCount = 0;
         _debugFilesStarted = false;
         _debugLooks.Clear();
+        _debugCloseUps = 0;
+        _closeUpsDue.Clear();
         _markerSnapshots = 0;
         _markerSnapshotNextAt = 0;
         _debugNextAt = 0;
