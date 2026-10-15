@@ -115,6 +115,33 @@ public class BarBlockDetectorTests
     }
 
     [Fact]
+    public void StaysWithTheOneItIsAlreadyGoingFor()
+    {
+        var detector = new BarBlockDetector(ShieldGame.Action());
+        for (long ms = 0; ms <= 2200; ms += 100)
+        {
+            var still = ShieldGame.Backdrop();
+            ShieldGame.Bar(still, 110);
+            detector.Look(still, ms);
+        }
+        // Two of the same kind, either side of the bar; the one at 200 degrees is a little further out.
+        for (long ms = 2300; ms <= 2500; ms += 30)
+        {
+            var frame = ShieldGame.Backdrop();
+            ShieldGame.Bar(frame, 110);
+            double t = (ms - 2300) / 1000.0;
+            ShieldGame.Ball(frame, 20, 60 + 60 * t, ShieldGame.White, ShieldGame.Cyan);
+            ShieldGame.Ball(frame, 200, 70 + 60 * t, ShieldGame.White, ShieldGame.Cyan);
+            detector.Look(frame, ms);
+        }
+        var fresh = detector.Choose(degreesPerSecond: 400);
+        Assert.Equal(200, Math.Round(fresh!.Angle / 10) * 10);          // left to itself: the one out further
+        var going = detector.Threats.Single(th => Math.Abs(BarBlockDetector.Wrap(th.Angle - 20)) < 5);
+        var kept = detector.Choose(degreesPerSecond: 400, current: going);
+        Assert.InRange(Math.Abs(BarBlockDetector.Wrap(kept!.Angle - 20)), 0, 5); // already going for the other: keeps going
+    }
+
+    [Fact]
     public void NoBarNoAngle()
     {
         var detector = new BarBlockDetector(ShieldGame.Action());

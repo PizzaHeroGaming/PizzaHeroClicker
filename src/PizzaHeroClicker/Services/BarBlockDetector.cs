@@ -268,14 +268,25 @@ public sealed class BarBlockDetector
     /// <paramref name="degreesPerSecond"/>), the most valuable, nearest escape first; if it can
     /// reach none in time, the one that will escape soonest.
     /// </summary>
-    public BarThreat? Choose(double degreesPerSecond)
+    /// <param name="barAngle">Where the bar is now, if the caller knows better than the last picture.</param>
+    /// <param name="current">
+    /// The one being steered for already. It is kept while it can still be reached and nothing more
+    /// valuable can be: switching back and forth between two equally good ones reaches neither.
+    /// </param>
+    public BarThreat? Choose(double degreesPerSecond, double? barAngle = null, BarThreat? current = null)
     {
         if (_threats.Count == 0) return null;
-        double bar = BarAngle ?? 0;
+        double? known = barAngle ?? BarAngle;
+        double bar = known ?? 0;
         double Escape(BarThreat t) => t.SecondsToEscape;
-        bool Reachable(BarThreat t) => BarAngle is null || Math.Abs(Wrap(t.Angle - bar)) / Math.Max(1, degreesPerSecond) <= Escape(t);
+        bool Reachable(BarThreat t) => known is null || Math.Abs(Wrap(t.Angle - bar)) / Math.Max(1, degreesPerSecond) <= Escape(t);
 
         var reachable = _threats.Where(Reachable).ToList();
+        if (current is not null)
+        {
+            var same = _threats.FirstOrDefault(t => t.Target == current.Target && Math.Abs(Wrap(t.Angle - current.Angle)) <= 6);
+            if (same is not null && (Reachable(same) || reachable.Count == 0) && !reachable.Any(t => t.Target < same.Target)) return same;
+        }
         if (reachable.Count > 0)
             return reachable.OrderBy(t => t.Target).ThenBy(Escape).First();
         return _threats.OrderBy(Escape).First();

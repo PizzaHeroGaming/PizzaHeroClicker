@@ -954,6 +954,7 @@ public sealed class ClickEngine : IDisposable
         bool calibrated = false;
         double degreesPerSecond = 180, pictureLagMs = 30;
         double? lastBar = null;          // the bar's angle when last seen
+        BarThreat? chasing = null;       // what the bar is being steered towards
         long lastBarSeenAt = 0;
         KeyCombo increaseKey = a.ClockwiseKey, decreaseKey = a.AnticlockwiseKey; // screen angles grow clockwise
         double loopMs = a.PollMs;   // how long one look-and-decide takes, on average
@@ -1158,7 +1159,8 @@ public sealed class ClickEngine : IDisposable
                 }
                 else
                 {
-                    if (detector.Choose(degreesPerSecond) is not { } threat)
+                    chasing = detector.Choose(degreesPerSecond, (barNow % 360 + 360) % 360, chasing);
+                    if (chasing is not { } threat)
                     {
                         Hold(0); // nothing coming: stay put
                     }
