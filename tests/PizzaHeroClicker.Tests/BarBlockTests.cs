@@ -17,13 +17,26 @@ internal static class ShieldGame
         Targets = new(BarBlockAction.RadiationDefaults()),
     };
 
-    /// <summary>A busy backdrop with nothing in it that is red, white or yellow.</summary>
-    public static int[] Backdrop()
+    /// <summary>
+    /// A busy backdrop with nothing in it that is white or yellow. With <paramref name="redClouds"/>,
+    /// two patches of the bar's red lie on its circle, each bigger than the bar (as in the real game).
+    /// </summary>
+    public static int[] Backdrop(bool redClouds = false)
     {
         var pixels = new int[Size * Size];
         for (int y = 0; y < Size; y++)
         for (int x = 0; x < Size; x++)
             pixels[y * Size + x] = (x / 9 + y / 13) % 3 switch { 0 => 0x101828, 1 => 0x30205A, _ => 0x183840 };
+        if (redClouds)
+        {
+            foreach (var (from, to) in new[] { (200.0, 225.0), (330.0, 350.0) })
+            for (double a = from; a <= to; a += 0.2)
+            for (int r = Radius - 12; r <= Radius + 12; r++)
+            {
+                int x = Centre + (int)Math.Round(r * Math.Cos(a * Math.PI / 180)), y = Centre + (int)Math.Round(r * Math.Sin(a * Math.PI / 180));
+                if ((x + y) % 3 != 0) pixels[y * Size + x] = 0xD84838; // a dull, speckled red, close enough to the bar's
+            }
+        }
         return pixels;
     }
 
@@ -67,6 +80,28 @@ public class BarBlockDetectorTests
         detector.Look(frame, 0);
         Assert.NotNull(detector.BarAngle);
         Assert.InRange(Math.Abs(BarBlockDetector.Wrap(detector.BarAngle!.Value - degrees)), 0, 2);
+    }
+
+    [Fact]
+    public void RedBackdropOnTheCircleIsTakenOffOnceTheBarHasMoved()
+    {
+        var detector = new BarBlockDetector(ShieldGame.Action());
+        var first = ShieldGame.Backdrop(redClouds: true);
+        ShieldGame.Bar(first, 90);
+        detector.Look(first, 0);
+        Assert.Equal(3, detector.Patches);                 // the bar and two backdrop patches
+        Assert.NotEqual(90, Math.Round(detector.BarAngle!.Value)); // the biggest patch is not the bar: fooled, for now
+        int[] before = detector.RawBins;
+
+        var second = ShieldGame.Backdrop(redClouds: true);
+        ShieldGame.Bar(second, 140);                        // the bar moved; the backdrop did not
+        detector.Look(second, 50);
+        detector.LearnBackdrop(before, detector.RawBins);
+
+        var third = ShieldGame.Backdrop(redClouds: true);
+        ShieldGame.Bar(third, 215);                         // even right on top of a backdrop patch
+        detector.Look(third, 100);
+        Assert.InRange(Math.Abs(BarBlockDetector.Wrap(detector.BarAngle!.Value - 215)), 0, 3);
     }
 
     [Fact]
@@ -115,10 +150,11 @@ public class BarBlockDetectorTests
 public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
 {
     [Theory]
-    [InlineData(0)]
-    [InlineData(33)] // the picture two frames behind the game, as a real screen capture can be
-    [InlineData(66)] // four frames behind
-    public void SteersTheBarInFrontOfTheBallsAndLetsGoOfTheKeysAtTheEnd(int pictureLagMs)
+    [InlineData(0, false)]
+    [InlineData(33, false)] // the picture two frames behind the game, as a real screen capture can be
+    [InlineData(66, false)] // four frames behind
+    [InlineData(33, true)]  // and with red backdrop on the bar's circle, bigger than the bar
+    public void SteersTheBarInFrontOfTheBallsAndLetsGoOfTheKeysAtTheEnd(int pictureLagMs, bool redClouds)
     {
         // A "shield" game run in real time: holding A turns the bar clockwise at 400 degrees a second,
         // D anticlockwise. A ball comes out of the middle every 0.7 s in a random direction and takes
@@ -162,7 +198,7 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
             {
                 Advance();
                 double ms = lastMs;
-                var frame = ShieldGame.Backdrop();
+                var frame = ShieldGame.Backdrop(redClouds);
                 double shown = history.LastOrDefault(h => h.Ms <= ms - pictureLagMs, history[0]).Angle;
                 ShieldGame.Bar(frame, shown);
                 for (int i = 0; i < balls.Count; i++)
@@ -194,7 +230,7 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
 
         Assert.True(outcome.Count >= 10, $"only {outcome.Count} balls reached the circle");
         int blocked = outcome.Values.Count(b => b);
-        output.WriteLine($"picture {pictureLagMs} ms behind: blocked {blocked} of {outcome.Count}");
+        output.WriteLine($"picture {pictureLagMs} ms behind{(redClouds ? ", red backdrop on the circle" : "")}: blocked {blocked} of {outcome.Count}");
         Assert.True(blocked >= outcome.Count * 0.8, $"blocked {blocked} of {outcome.Count}");
         Assert.Equal(0, input.HeldCount); // nothing left held down
     }

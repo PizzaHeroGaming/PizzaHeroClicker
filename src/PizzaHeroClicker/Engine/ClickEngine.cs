@@ -988,11 +988,13 @@ public sealed class ClickEngine : IDisposable
         }
 
         // Holds the "clockwise" key briefly while watching the bar: which way it really turns it,
-        // how fast, and how long the picture takes to show the bar starting to move.
-        bool Calibrate(double before)
+        // how fast, how long the picture takes to show it moving, and, from the two places it was
+        // seen, which patches of its colour on the circle are only backdrop (they stayed put).
+        bool Calibrate()
         {
-            const double PressMs = 200, WatchMs = 350, MovedDegrees = 2;
-            var samples = new List<(double Ms, double Angle)>();
+            const double PressMs = 200, WatchMs = 350;
+            int[] before = detector.RawBins;
+            var samples = new List<(double Ms, int[] Bins)>();
             _input.KeyComboDown(a.ClockwiseKey);
             long down = TimingEngine.Now;
             bool released = false;
@@ -1006,7 +1008,7 @@ public sealed class ClickEngine : IDisposable
                         released = true;
                     }
                     long at = TimingEngine.Now;
-                    if (Look(out var angle) && angle is double seenAngle) samples.Add((TimingEngine.TicksToMs(at - down), seenAngle));
+                    if (Look(out _)) samples.Add((TimingEngine.TicksToMs(at - down), detector.RawBins));
                     _t = TimingEngine.Now;
                     if (!Advance(5, scaled: false)) return false;
                 }
@@ -1015,21 +1017,49 @@ public sealed class ClickEngine : IDisposable
             {
                 if (!released) _input.KeyComboUp(a.ClockwiseKey);
             }
+            if (samples.Count == 0) return true;
 
-            int firstMoved = samples.FindIndex(p => Math.Abs(BarBlockDetector.Wrap(p.Angle - before)) >= MovedDegrees);
-            double turned = samples.Count > 0 ? BarBlockDetector.Wrap(samples[^1].Angle - before) : 0;
-            if (firstMoved < 0 || Math.Abs(turned) < 2 * MovedDegrees)
+            // Where the colour left from and where it arrived: the bar's old and new places.
+            int[] after = samples[^1].Bins;
+            var (left, leftCount) = Shift(before, after);
+            var (arrived, arrivedCount) = Shift(after, before);
+            if (leftCount < BarBlockDetector.MinBarPixels || arrivedCount < BarBlockDetector.MinBarPixels)
             {
-                Log.Info($"Block: {a.ClockwiseKey.Display} did not visibly turn the bar while it was held; assuming it turns clockwise, at about {degreesPerSecond:0} degrees a second.");
+                Log.Info($"Block: {a.ClockwiseKey.Display} did not visibly move the bar while it was held; assuming it turns clockwise, at about {degreesPerSecond:0} degrees a second." +
+                         (detector.Patches > 1 ? $" There are {detector.Patches} patches of the bar's colour on its circle, so it may be steering a patch of backdrop: check the bar's colour." : ""));
                 return true;
             }
+            double turned = BarBlockDetector.Wrap(arrived - left);
             if (turned < 0) (increaseKey, decreaseKey) = (a.AnticlockwiseKey, a.ClockwiseKey);
             degreesPerSecond = Math.Clamp(Math.Abs(turned) / (PressMs / 1000), 20, 3000);
-            // The picture showed MovedDegrees of turning at that sample: take off the time that much turning takes.
-            pictureLagMs = Math.Clamp(samples[firstMoved].Ms - MovedDegrees / degreesPerSecond * 1000, 0, 200);
+            // When the picture first showed the colour leaving its old place.
+            int firstMoved = samples.FindIndex(p => Shift(before, p.Bins).Count >= leftCount * 0.25);
+            if (firstMoved >= 0) pictureLagMs = Math.Clamp(samples[firstMoved].Ms - 0.25 * 10 / degreesPerSecond * 1000, 0, 200);
+            bool learned = Math.Abs(turned) >= 12; // moved clear of where it was: what stayed is backdrop
+            if (learned) detector.LearnBackdrop(before, after);
             Log.Info($"Block: {a.ClockwiseKey.Display} turns the bar {(turned > 0 ? "clockwise" : "anticlockwise")} at about {degreesPerSecond:0} degrees a second; " +
-                     $"the picture shows it about {pictureLagMs:0} ms after the key goes down.");
+                     $"the picture shows it about {pictureLagMs:0} ms after the key goes down." +
+                     (detector.Patches > 1 ? learned
+                         ? $" {detector.Patches - 1} patch{(detector.Patches == 2 ? "" : "es")} of the bar's colour that stayed put will be ignored as backdrop."
+                         : " Other patches of the bar's colour are on its circle, and it did not move far enough to tell them apart." : ""));
             return true;
+        }
+
+        // Where some colour was in "from" but not in "to": its mean angle and how much of it.
+        static (double Angle, int Count) Shift(int[] from, int[] to)
+        {
+            double sx = 0, sy = 0;
+            int count = 0;
+            for (int i = 0; i < 360; i++)
+            {
+                int d = from[i] - to[i] - BarBlockDetector.BackdropSlack;
+                if (d <= 0) continue;
+                count += d;
+                double r = (i + 0.5) * Math.PI / 180;
+                sx += d * Math.Cos(r);
+                sy += d * Math.Sin(r);
+            }
+            return (count == 0 ? 0 : (Math.Atan2(sy, sx) * 180 / Math.PI + 360) % 360, count);
         }
 
         try
@@ -1063,7 +1093,7 @@ public sealed class ClickEngine : IDisposable
                 else if (!calibrated)
                 {
                     calibrated = true;
-                    if (!Calibrate(bar)) return false;
+                    if (!Calibrate()) return false;
                 }
                 else
                 {

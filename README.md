@@ -243,7 +243,9 @@ While it runs it finds the bar on its circle and the things flying out (they are
 busy backdrop by their movement, then by their colour), holds whichever key turns the bar towards
 the one to block, and lets go when it is lined up; close to the target it taps the key for exactly
 the time the remaining turn takes. Keys are released when it pauses, stops or loses the game window.
-The first two seconds are spent learning the backdrop.
+The first two seconds are spent learning the backdrop. If the backdrop has the bar's colour on parts
+of its circle (red clouds behind a red bar), the patches that stay put while the bar turns at the
+start are ignored from then on; the TEST button mentions it when it sees such patches.
 
 **Profiles and saving**
 

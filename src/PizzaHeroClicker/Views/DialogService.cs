@@ -79,7 +79,12 @@ public sealed class DialogService(ScreenService screen) : IDialogService
                 var text = new System.Text.StringBuilder();
                 if (looks == 0) text.AppendLine("That part of the screen could not be captured.");
                 else if (lastBar is double bar)
+                {
                     text.AppendLine($"Bar: found in {barLooks} of {looks} looks, last at {bar:0} degrees ({lastBarPixels} pixels of its colour on its circle).");
+                    if (detector.Patches > 1)
+                        text.AppendLine($"Note: the bar's colour shows up in {detector.Patches} separate places on its circle, so the backdrop has it too. " +
+                                        "That is fine: at the start of each run the bar is moved briefly, and whatever stays put is ignored from then on.");
+                }
                 else
                     text.AppendLine("Bar: NOT found on its circle. Click PICK THE BAR again, right on the bar, so its circle and colour are set from it.");
                 if (looks > 0)

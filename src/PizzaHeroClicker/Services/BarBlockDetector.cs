@@ -78,30 +78,73 @@ public sealed class BarBlockDetector
 
     private void FindBar(int[] pixels)
     {
-        Array.Clear(_bins);
+        Array.Clear(_raw);
         int tol = _action.BarTolerance;
         foreach (var (offset, bin) in _barBand)
         {
             int p = pixels[offset];
             if (Math.Abs(((p >> 16) & 0xFF) - _barColour.R) <= tol
                 && Math.Abs(((p >> 8) & 0xFF) - _barColour.G) <= tol
-                && Math.Abs((p & 0xFF) - _barColour.B) <= tol) _bins[bin]++;
+                && Math.Abs((p & 0xFF) - _barColour.B) <= tol) _raw[bin]++;
         }
+        Patches = CountPatches(_raw);
+        (BarAngle, BarPixels) = Locate(_raw, BarAngle);
+    }
 
-        // The bar is a run of neighbouring angles. Prefer the run nearest where it was last time
-        // (it only moves a few degrees between looks), otherwise the biggest.
-        double? previous = BarAngle;
+    /// <summary>
+    /// Pixel counts of the bar's colour round its circle, one per degree, as last seen (before any
+    /// backdrop is taken off). Used to learn the backdrop: see <see cref="LearnBackdrop"/>.
+    /// </summary>
+    public int[] RawBins => (int[])_raw.Clone();
+
+    /// <summary>
+    /// How many separate patches of the bar's colour lie on its circle (before the backdrop is
+    /// taken off). More than one means the backdrop has that colour too somewhere on the circle.
+    /// </summary>
+    public int Patches { get; private set; }
+
+    /// <summary>True once the backdrop's patches of the bar's colour are known and taken off.</summary>
+    public bool KnowsBackdrop => _background is not null;
+
+    /// <summary>
+    /// The backdrop may carry the bar's colour on parts of the circle (red clouds behind a red
+    /// bar). Given the counts with the bar in two places far enough apart, whatever was there both
+    /// times is backdrop, and is taken off every look from now on, leaving only the bar.
+    /// </summary>
+    public void LearnBackdrop(int[] before, int[] after)
+    {
+        _background = new int[360];
+        for (int i = 0; i < 360; i++) _background[i] = Math.Min(before[i], after[i]);
+        BarAngle = null; // found afresh, now without the backdrop
+    }
+
+    /// <summary>Where the bar is in a set of counts, with the backdrop taken off: the run nearest <paramref name="near"/>, otherwise the biggest.</summary>
+    public (double? Angle, int Pixels) Locate(int[] raw, double? near)
+    {
+        for (int i = 0; i < 360; i++)
+            _bins[i] = _background is null ? raw[i] : Math.Max(0, raw[i] - _background[i] - BackdropSlack);
         (double Angle, int Count)? best = null;
         double bestScore = double.MaxValue;
         foreach (var run in Runs())
         {
             if (run.Count < MinBarPixels) continue;
-            double score = previous is double p ? Math.Abs(Wrap(run.Angle - p)) - run.Count * 1e-6 : -run.Count;
+            // Prefer the run nearest where it was last time (it only moves a few degrees between looks), otherwise the biggest.
+            double score = near is double p ? Math.Abs(Wrap(run.Angle - p)) - run.Count * 1e-6 : -run.Count;
             if (best is null || score < bestScore) (best, bestScore) = (run, score);
         }
-        BarAngle = best?.Angle;
-        BarPixels = best?.Count ?? 0;
+        return (best?.Angle, best?.Count ?? 0);
     }
+
+    private int CountPatches(int[] raw)
+    {
+        Array.Copy(raw, _bins, 360);
+        return Runs().Count(r => r.Count >= MinBarPixels);
+    }
+
+    /// <summary>Changes this small in a degree's count are noise, not the bar.</summary>
+    public const int BackdropSlack = 2;
+    private readonly int[] _raw = new int[360];
+    private int[]? _background;
 
     /// <summary>Runs of non-empty 1-degree bins (allowing one-bin gaps, and wrapping past 360), with their mean angle.</summary>
     private IEnumerable<(double Angle, int Count)> Runs()
