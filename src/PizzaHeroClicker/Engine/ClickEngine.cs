@@ -946,7 +946,7 @@ public sealed class ClickEngine : IDisposable
             });
         }
         if (steerLog is not null)
-            Note($"Block with a bar: looking at ({bx}, {by}), {size} x {size}; centre ({a.CentreX}, {a.CentreY}), circle {a.Radius} px, bar colour {a.BarColor} +-{a.BarTolerance}; " +
+            Note($"Block with a bar: looking at ({bx}, {by}), {size} x {size}; centre ({a.CentreX}, {a.CentreY}), circle {a.Radius} px, {a.BarCount} bar{(a.BarCount == 1 ? "" : "s")}, bar colour {a.BarColor} +-{a.BarTolerance}; " +
                  $"blocking {string.Join(", ", a.Targets.Select(t => $"{t.Color} +-{t.Tolerance}"))}. Angles: 0 = right, 90 = down (clockwise).");
 
         // What the action learns about the game at the start: which key turns the bar which way,
