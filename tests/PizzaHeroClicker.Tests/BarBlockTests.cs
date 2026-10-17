@@ -151,6 +151,35 @@ public class BarBlockDetectorTests
         Assert.Equal(Math.Abs(expected), Math.Abs(BarBlockDetector.ToNearestBar(target, bar, bars)), 3);
 
     [Fact]
+    public void ASecondBarInATargetsColourIsNotTakenForATarget()
+    {
+        // The second bar is green, close to the green kind of thing to block. It moves round with the
+        // first bar, staying the same distance out: it must not show up as something flying out.
+        var detector = new BarBlockDetector(ShieldGame.Action());
+        for (long ms = 0; ms <= 3000; ms += 30)
+        {
+            double angle = 40 + ms * 0.06;
+            var frame = ShieldGame.Backdrop();
+            ShieldGame.Bar(frame, angle);
+            ShieldGame.Bar(frame, angle + 180, colour: 0x60F070);
+            detector.Look(frame, ms);
+        }
+        Assert.Empty(detector.Threats);
+
+        // A real green one flying out is still seen, all the way.
+        for (long ms = 3030; ms <= 4500; ms += 30)
+        {
+            double angle = 40 + ms * 0.06;
+            var frame = ShieldGame.Backdrop();
+            ShieldGame.Bar(frame, angle);
+            ShieldGame.Bar(frame, angle + 180, colour: 0x60F070);
+            ShieldGame.Ball(frame, 300, 45 + (ms - 3030) * 0.06, 0x70F070, ShieldGame.White);
+            detector.Look(frame, ms);
+        }
+        Assert.Contains(detector.Threats, t => t.Target == 0 && Math.Abs(BarBlockDetector.Wrap(t.Angle - 300)) < 4 && t.Distance > 110);
+    }
+
+    [Fact]
     public void NoBarNoAngle()
     {
         var detector = new BarBlockDetector(ShieldGame.Action());

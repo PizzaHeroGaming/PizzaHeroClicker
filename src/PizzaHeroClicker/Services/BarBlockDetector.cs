@@ -250,7 +250,7 @@ public sealed class BarBlockDetector
             double outward = (vx * (t.X - _centre) + vy * (t.Y - _centre)) / Math.Max(1, t.Distance);
             if (outward > 5) _typicalSpeed += (outward - _typicalSpeed) * 0.2; // most fly at much the same speed
             double speed = outward > 5 ? outward : _typicalSpeed;
-            Remember(t, timeMs + (r - t.Distance) / speed * 1000, timeMs);
+            Remember(t, timeMs + (r - t.Distance) / speed * 1000, timeMs, outward > 5);
         }
 
         // Things fly straight out, so where one will cross the circle is known from the moment it is
@@ -258,27 +258,35 @@ public sealed class BarBlockDetector
         // mind until it is due to cross, even after it has been lost from view.
         _pending.RemoveAll(p => timeMs > p.CrossesAtMs + 40 || timeMs - p.LastSeenMs > 700);
         foreach (var p in _pending)
+        {
+            // Out near the bar's circle, only something seen flying outward counts. Whatever stays the
+            // same distance out and only moves round is a bar (another bar, perhaps, whose colour is
+            // close to something worth blocking), not a threat.
+            if (p.Threat.Distance > r * 0.7 && !p.MovingOut && p.Threat.Distance - p.FirstDistance < 15) continue;
             _threats.Add(p.Threat with { SecondsToEscape = Math.Max(0, (p.CrossesAtMs - timeMs) / 1000) });
+        }
     }
 
     private sealed class Pending
     {
         public BarThreat Threat = null!;
-        public double CrossesAtMs, LastSeenMs;
+        public double CrossesAtMs, LastSeenMs, FirstDistance;
+        public bool MovingOut;     // has been measured heading outward
     }
     private readonly List<Pending> _pending = new();
     private double _typicalSpeed = 300;
 
-    private void Remember(BarThreat t, double crossesAtMs, double nowMs)
+    private void Remember(BarThreat t, double crossesAtMs, double nowMs, bool movingOut)
     {
         foreach (var p in _pending)
         {
             // The same one as before: same kind, same direction, further out.
             if (p.Threat.Target != t.Target || Math.Abs(Wrap(p.Threat.Angle - t.Angle)) > 6 || t.Distance < p.Threat.Distance - 10) continue;
             (p.Threat, p.CrossesAtMs, p.LastSeenMs) = (t, crossesAtMs, nowMs);
+            p.MovingOut |= movingOut;
             return;
         }
-        _pending.Add(new Pending { Threat = t, CrossesAtMs = crossesAtMs, LastSeenMs = nowMs });
+        _pending.Add(new Pending { Threat = t, CrossesAtMs = crossesAtMs, LastSeenMs = nowMs, FirstDistance = t.Distance, MovingOut = movingOut });
     }
 
     /// <summary>
