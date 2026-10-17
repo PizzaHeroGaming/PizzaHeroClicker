@@ -129,6 +129,9 @@ public sealed class ClickEngine : IDisposable
     private volatile int _debugRun;     // changes whenever a new recording starts
     private bool _debugFilesStarted;    // this run has replaced the previous run's files
     private readonly StringBuilder _debugLooks = new(); // looks.txt: time (ms) then every candidate's screen position
+    private readonly StringBuilder _debugScreen = new(); // screen.txt: per look, how much of the area changed, and why nothing was clicked
+    private readonly Queue<(double Ms, int[] Pixels, int Width, int Height)> _recentLooks = new();
+    private const int RecentLooksKept = 45;
     // Close-ups round each click: "a" from the look that found the target, "b" a moment after the click.
     private const int MaxCloseUps = 150, CloseUpRadius = 70;
     private const double CloseUpAfterMs = 150;
@@ -761,11 +764,29 @@ public sealed class ClickEngine : IDisposable
                     }
                 }
             }
-            if (captured && _debugFolder is not null && _debugCount < MaxDebugSnapshots && _debugLooks.Length < 400_000)
+            if (captured && _debugFolder is not null)
             {
-                _debugLooks.Append(TimingEngine.TicksToMs(lookedAt - _debugStartedAt).ToString("0", System.Globalization.CultureInfo.InvariantCulture));
-                foreach (var (ox, oy) in detector.LastOffers) _debugLooks.Append($" {a.X + sx + ox},{a.Y + sy + oy}");
-                _debugLooks.Append(Environment.NewLine);
+                double lookMs = TimingEngine.TicksToMs(lookedAt - _debugStartedAt);
+                var inv = System.Globalization.CultureInfo.InvariantCulture;
+                if (_debugLooks.Length < 2_000_000)
+                {
+                    _debugLooks.Append(lookMs.ToString("0", inv));
+                    foreach (var (ox, oy) in detector.LastOffers) _debugLooks.Append($" {a.X + sx + ox},{a.Y + sy + oy}");
+                    _debugLooks.Append(Environment.NewLine);
+                }
+                if (_debugScreen.Length < 2_000_000)
+                    _debugScreen.Append(string.Format(inv, "{0,7:0} ms  differs from scene {1,6:0.0%}  changed since last look {2,6:0.0%}  detail {3:0.000}{4}{5}",
+                        lookMs, detector.LastChangedShare, detector.LastMovingShare, detector.LastDetail,
+                        detector.IsScreenChanged ? "  DIFFERENT SCREEN" : "", found is var (fx, fy, _) ? $"  target ({a.X + sx + fx}, {a.Y + sy + fy})" : "")).Append(Environment.NewLine);
+                // The last moment of the game, at full speed but a third of the size, saved when the watch ends.
+                const int shrink = 3;
+                int sw = a.Width / shrink, sh = a.Height / shrink;
+                var small = _recentLooks.Count >= RecentLooksKept ? _recentLooks.Dequeue().Pixels : new int[sw * sh];
+                if (small.Length != sw * sh) small = new int[sw * sh];
+                for (int row = 0; row < sh; row++)
+                for (int col = 0; col < sw; col++)
+                    small[row * sw + col] = _areaPixels[row * shrink * a.Width + col * shrink];
+                _recentLooks.Enqueue((lookMs, small, sw, sh));
             }
             _differentScreen = captured && detector.IsScreenChanged;
             if (record) SaveDebugSnapshot(a, detector);
@@ -1373,6 +1394,7 @@ public sealed class ClickEngine : IDisposable
         {
             foreach (string old in Directory.EnumerateFiles(folder, "*.png")) File.Delete(old);
             File.Delete(Path.Combine(folder, "looks.txt"));
+            File.Delete(Path.Combine(folder, "screen.txt"));
             File.Delete(Path.Combine(folder, "steer.txt"));
             File.WriteAllText(Path.Combine(folder, "report.txt"),
                 $"Area watch troubleshooting run, started {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss}{Environment.NewLine}");
@@ -1393,6 +1415,8 @@ public sealed class ClickEngine : IDisposable
         _debugCount = 0;
         _debugFilesStarted = false;
         _debugLooks.Clear();
+        _debugScreen.Clear();
+        _recentLooks.Clear();
         _debugCloseUps = 0;
         _closeUpsDue.Clear();
         _markerSnapshots = 0;
@@ -1464,6 +1488,32 @@ public sealed class ClickEngine : IDisposable
     {
         if (_debugFolder is not { } folder || _debugCount == 0) return;
         SaveSurroundings(a, folder, "surroundings-end.png");
+        // The last moment before the end, look by look, and whatever was logged since the last frame.
+        var lastLooks = _recentLooks.ToList();
+        _recentLooks.Clear();
+        string looksTail = _debugLooks.ToString(), screenText = _debugScreen.ToString();
+        _debugLooks.Clear();
+        _debugScreen.Clear();
+        Task.Run(() =>
+        {
+            try
+            {
+                for (int i = 0; i < lastLooks.Count; i++)
+                {
+                    var (ms, px, w, h) = lastLooks[i];
+                    TemplateImage.SavePng(Path.Combine(folder, $"end-{i + 1:00}-{ms:0}ms.png"), px, w, h);
+                }
+                lock (DebugFileLock)
+                {
+                    File.AppendAllText(Path.Combine(folder, "looks.txt"), looksTail);
+                    File.AppendAllText(Path.Combine(folder, "screen.txt"), screenText);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Could not save the end of the watch", ex);
+            }
+        });
         // Clicks made after the last saved frame are otherwise never written down.
         if (_debugClicks.Length > 0)
         {

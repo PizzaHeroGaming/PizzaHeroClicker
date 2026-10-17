@@ -109,6 +109,8 @@ public sealed class AreaReport
     public bool ScreenChanged;
     /// <summary>True when much of the area changed since the previous look: the whole picture is moving (a zoom, a transition).</summary>
     public bool ScreenMoving;
+    /// <summary>True when the picture suddenly lost most of its detail (pixelated, blurred or faded: a transition).</summary>
+    public bool LostDetail;
     public int TooSmall, TooLarge, LargestPixels, MinPixels, MaxPixels;
 }
 
@@ -166,6 +168,38 @@ public sealed class AreaDetector
     /// True if more than <see cref="ScreenMovingShare"/> of the area changed since the previous look
     /// (taken no more than a quarter of a second ago).
     /// </summary>
+    private double _usualDetail = -1;
+
+    /// <summary>For troubleshooting: at the last look, the share of the area that differed from the learned scene...</summary>
+    public double LastChangedShare { get; private set; }
+    /// <summary>...the share that changed since the previous look...</summary>
+    public double LastMovingShare { get; private set; }
+    /// <summary>...and how much fine detail the picture had (see the lost-detail check).</summary>
+    public double LastDetail { get; private set; }
+    private const double LostDetailShare = 0.5, MinDetailToJudge = 0.03;
+
+    /// <summary>
+    /// How much fine detail the picture has: the share of sample points where the colour jumps
+    /// sharply over two pixels. Pixelating, blurring or fading a picture lowers it a lot.
+    /// </summary>
+    private static double Detail(int[] pixels, int width, int height)
+    {
+        int samples = 0, sharp = 0;
+        for (int y = 0; y + 2 < height; y += MotionStep)
+        {
+            int row = y * width;
+            for (int x = 0; x + 2 < width; x += MotionStep)
+            {
+                int a = pixels[row + x], b = pixels[row + x + 2], c = pixels[row + 2 * width + x];
+                int dx = Math.Abs(((a >> 16) & 0xFF) - ((b >> 16) & 0xFF)) + Math.Abs(((a >> 8) & 0xFF) - ((b >> 8) & 0xFF)) + Math.Abs((a & 0xFF) - (b & 0xFF));
+                int dy = Math.Abs(((a >> 16) & 0xFF) - ((c >> 16) & 0xFF)) + Math.Abs(((a >> 8) & 0xFF) - ((c >> 8) & 0xFF)) + Math.Abs((a & 0xFF) - (c & 0xFF));
+                samples++;
+                if (dx > 60 || dy > 60) sharp++;
+            }
+        }
+        return samples == 0 ? 0 : (double)sharp / samples;
+    }
+
     private bool ScreenMoving(int[] pixels, int width, int height, double lookMs)
     {
         int gw = width / MotionStep, gh = height / MotionStep, cells = gw * gh;
@@ -186,6 +220,7 @@ public sealed class AreaDetector
             }
         }
         _previousLookMs = lookMs;
+        LastMovingShare = comparable ? (double)changed / cells : 0;
         return comparable && changed > cells * ScreenMovingShare;
     }
 
@@ -385,7 +420,8 @@ public sealed class AreaDetector
             // of it suddenly differs from what was learned, something else is being shown. This
             // is checked whatever the backdrop, because the dangerous case is exactly a busy
             // game giving way to a plain screen decorated with pictures of the same targets.
-            bool screenChanged = _scene.Ready && _blobFinder.MarkAgainstScene(pixels, width, height, _scene) > ScreenChangedShare;
+            LastChangedShare = _scene.Ready ? _blobFinder.MarkAgainstScene(pixels, width, height, _scene) : 0;
+            bool screenChanged = _scene.Ready && LastChangedShare > ScreenChangedShare;
             // One exception: a plain backdrop that is still the same plain colour is the same screen,
             // however much of it changed. (A small area around one large target loses a third of
             // its content every time that target is clicked away; that is not a new screen.)
@@ -398,6 +434,17 @@ public sealed class AreaDetector
             bool moving = ScreenMoving(pixels, width, height, lookMs) && (busy || _learnedBusy);
             if (report is not null) report.ScreenMoving = moving;
             screenChanged |= moving;
+            // Nor while the picture has lost its detail. A game can end by pixelating, blurring or
+            // fading its screen: the colours stay much the same (so it is not a "different screen")
+            // and little changes from one look to the next (so it is not "moving"), but the fine
+            // detail of the scene is suddenly gone, and the blocks or smears it leaves can look
+            // like targets. During play the amount of detail hardly changes.
+            double detail = Detail(pixels, width, height);
+            LastDetail = detail;
+            bool lostDetail = (busy || _learnedBusy) && _usualDetail >= MinDetailToJudge && detail < _usualDetail * LostDetailShare;
+            if (report is not null) report.LostDetail = lostDetail;
+            screenChanged |= lostDetail;
+            if (!screenChanged) _usualDetail = _usualDetail < 0 ? detail : _usualDetail + (detail - _usualDetail) * 0.05;
             if (screenChanged)
             {
                 // Before anything has been clicked, a new screen is the game OPENING: learn it at once.
@@ -597,6 +644,7 @@ public sealed class AreaDetector
                 text.AppendLine($"Ignoring {_stillSpots.Count} spot{(_stillSpots.Count == 1 ? "" : "s")} where something stayed put while the scene moved (part of the game's display, not a target): "
                                 + string.Join(", ", _stillSpots.Select(s => $"({s.X}, {s.Y})")) + ".");
             if (report.ScreenMoving) text.AppendLine("The whole picture is moving (a zoom or a transition), so nothing is clicked until it settles.");
+            else if (report.LostDetail) text.AppendLine("The picture has suddenly lost its detail (pixelated, blurred or faded: a transition), so nothing is clicked.");
             else if (report.ScreenChanged) text.AppendLine("This is a different screen from the one the watch was playing on, so nothing on it is treated as a target.");
             if (report.TooSmall + report.TooLarge > 0)
                 text.AppendLine($"Ignored for size: {report.TooSmall} too small (under {report.MinPixels:N0} px), {report.TooLarge} too large (over {report.MaxPixels:N0} px; the largest was {report.LargestPixels:N0} px).");
