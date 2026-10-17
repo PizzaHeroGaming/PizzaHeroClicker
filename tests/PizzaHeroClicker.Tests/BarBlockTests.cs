@@ -216,6 +216,17 @@ public class BarBlockDetectorTests
     }
 
     [Fact]
+    public void BothOnlyIfTheBarCanGetGoingAgainInTime()
+    {
+        // The bar covers a common ball about to arrive; a valuable one arrives a moment later, 30
+        // degrees round. With an instant restart there is just time for both. Allowing for the bar
+        // to get going again after the block, there is not: then the valuable one is the one to have.
+        var detector = TwoBalls(90, (93, 100, ShieldGame.White, ShieldGame.Cyan), (60, 70, ShieldGame.Yellow, ShieldGame.White));
+        Assert.Equal(3, detector.Choose(degreesPerSecond: 64)!.Target);
+        Assert.Equal(2, detector.Choose(degreesPerSecond: 64, restartSeconds: 0.2)!.Target);
+    }
+
+    [Fact]
     public void NoBarNoAngle()
     {
         var detector = new BarBlockDetector(ShieldGame.Action());

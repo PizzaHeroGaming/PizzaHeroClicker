@@ -311,7 +311,12 @@ public sealed class BarBlockDetector
     /// The one being steered for already. Kept when another plan is only as good, so the bar does
     /// not swap back and forth between equally good choices and reach neither.
     /// </param>
-    public BarThreat? Choose(double degreesPerSecond, double? barAngle = null, BarThreat? current = null)
+    /// <param name="restartSeconds">
+    /// How long the bar takes to get going again after standing still to block one (the key's
+    /// effect showing, the next look). Counted on every move that follows a block in a plan, so a
+    /// plan that only works if the bar sets off the instant one arrives is not relied on.
+    /// </param>
+    public BarThreat? Choose(double degreesPerSecond, double? barAngle = null, BarThreat? current = null, double restartSeconds = 0)
     {
         PlannedNext = null;
         if (_threats.Count == 0) return null;
@@ -350,7 +355,7 @@ public sealed class BarBlockDetector
                 double offset = ToNearestBar(t.Angle, angle, _action.BarCount);
                 double move = Math.Max(0, Math.Abs(offset) - reach);
                 double turn = Math.Max(0, move - (offset > 0 ? freeUp : freeDown));
-                double arrive = time + turn / speed;
+                double arrive = time + (turn > 0 && depth > 0 ? restartSeconds : 0) + turn / speed;
                 if (arrive > t.SecondsToEscape) continue; // cannot get there in time: not in this plan
                 // Got there: the bar now sits with the target just inside its near end, until it arrives.
                 double sitAt = angle + Math.Sign(offset) * move;

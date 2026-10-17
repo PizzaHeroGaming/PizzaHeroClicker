@@ -1188,7 +1188,8 @@ public sealed class ClickEngine : IDisposable
                 }
                 else
                 {
-                    chasing = detector.Choose(degreesPerSecond, (barNow % 360 + 360) % 360, chasing);
+                    chasing = detector.Choose(degreesPerSecond, (barNow % 360 + 360) % 360, chasing,
+                        restartSeconds: (pictureLagMs + Math.Max(loopMs, a.PollMs)) / 1000);
                     if (chasing is not { } threat)
                     {
                         Hold(0); // nothing coming: stay put
@@ -1207,7 +1208,9 @@ public sealed class ClickEngine : IDisposable
                             Hold(0);
                             // Covered. If the plan has another to reach next, drift towards it while
                             // waiting, keeping this one inside the bar's span: a head start on the next.
-                            if (detector.PlannedNext is { } next && threat.SecondsToEscape > LastMomentSeconds)
+                            // Not in its last moment unless the whole bar is in view: a part-hidden bar's
+                            // place is reckoned, and only a sure place is safe to edge away from.
+                            if (detector.PlannedNext is { } next && (threat.SecondsToEscape > LastMomentSeconds || wholeBar))
                             {
                                 int toNext = Math.Sign(BarBlockDetector.ToNearestBar(next.Angle, barNow, a.BarCount));
                                 double keep = Math.Max(0, within - DriftMarginDegrees);
