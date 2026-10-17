@@ -929,6 +929,7 @@ public sealed class ClickEngine : IDisposable
 
     private int _releasedAll; // counts the times Housekeeping let go of every key, so a holder knows its key is up
     private const double UnseenBarMs = 1500;   // how long to steer by reckoning alone while the bar cannot be seen
+    private const double DriftMarginDegrees = 2; // drifting while covering one leaves it at least this far inside the bar's span
     private const double LastMomentSeconds = 0.3; // this close to arriving, a target the bar already covers is left alone
 
     /// <summary>
@@ -1204,6 +1205,22 @@ public sealed class ClickEngine : IDisposable
                         if (Math.Abs(error) <= within)
                         {
                             Hold(0);
+                            // Covered. If the plan has another to reach next, drift towards it while
+                            // waiting, keeping this one inside the bar's span: a head start on the next.
+                            if (detector.PlannedNext is { } next && threat.SecondsToEscape > LastMomentSeconds)
+                            {
+                                int toNext = Math.Sign(BarBlockDetector.ToNearestBar(next.Angle, barNow, a.BarCount));
+                                double keep = Math.Max(0, within - DriftMarginDegrees);
+                                double drift = keep + toNext * error; // degrees the bar can move toNext and still cover it
+                                if (toNext != 0 && drift >= 2)
+                                {
+                                    Hold(toNext);
+                                    _t = TimingEngine.Now;
+                                    bool ok = Advance(drift / degreesPerSecond * 1000, scaled: false);
+                                    Hold(0);
+                                    if (!ok) return false;
+                                }
+                            }
                         }
                         else if (threat.SecondsToEscape < LastMomentSeconds && Math.Abs(error) <= within + BarBlockDetector.EdgeMarginDegrees)
                         {

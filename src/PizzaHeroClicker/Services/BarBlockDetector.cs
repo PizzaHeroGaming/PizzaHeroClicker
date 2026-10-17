@@ -263,9 +263,17 @@ public sealed class BarBlockDetector
             // same distance out and only moves round is a bar (another bar, perhaps, whose colour is
             // close to something worth blocking), not a threat.
             if (p.Threat.Distance > r * 0.7 && !p.MovingOut && p.Threat.Distance - p.FirstDistance < 15) continue;
+            // Things fly out from the middle, so one first seen out by the circle is seen there because
+            // something else (a ball meeting another bar, say) lit up a bar of its colour, unless it
+            // is then seen covering ground outward. Its "speed" alone is no proof: the tracker can pair
+            // it with the ball that just hit that bar.
+            if (p.FirstDistance > r * 0.7 && p.Threat.Distance - p.FirstDistance < MinTravelOutPx) continue;
             _threats.Add(p.Threat with { SecondsToEscape = Math.Max(0, (p.CrossesAtMs - timeMs) / 1000) });
         }
     }
+
+    /// <summary>How far something first seen out near the circle must then travel outward to count.</summary>
+    private const double MinTravelOutPx = 25;
 
     private sealed class Pending
     {
@@ -305,6 +313,7 @@ public sealed class BarBlockDetector
     /// </param>
     public BarThreat? Choose(double degreesPerSecond, double? barAngle = null, BarThreat? current = null)
     {
+        PlannedNext = null;
         if (_threats.Count == 0) return null;
         double bar = barAngle ?? BarAngle ?? 0;
         double speed = Math.Max(1, degreesPerSecond);
@@ -314,11 +323,14 @@ public sealed class BarBlockDetector
         int kinds = Math.Max(1, _action.Targets.Count);
         double Weight(BarThreat t) => Math.Pow(KindWeight, kinds - 1 - Math.Clamp(t.Target, 0, kinds - 1));
 
-        BarThreat? bestFirst = null;
+        BarThreat? bestFirst = null, bestSecond = null;
         double bestValue = -1, bestFinish = double.MaxValue;
         var used = new bool[threats.Count];
 
-        void Search(int depth, double angle, double time, double value, BarThreat? first)
+        // freeUp / freeDown: how far the bar can still drift either way, while waiting for the last
+        // one in the plan to arrive, without letting it out of the bar's span. A wait spent drifting
+        // towards the next one is a head start on it.
+        void Search(int depth, double angle, double freeUp, double freeDown, double time, double value, BarThreat? first, BarThreat? second)
         {
             // Every order is scored as far as it goes: stopping early is one of the plans too.
             // Better = blocks more; then, equally good, starts with what is already being chased;
@@ -328,7 +340,7 @@ public sealed class BarBlockDetector
                 int keeps = Same(first, current) ? 1 : 0, bestKeeps = Same(bestFirst, current) ? 1 : 0;
                 bool better = value > bestValue + 1e-9
                     || (value > bestValue - 1e-9 && (keeps > bestKeeps || (keeps == bestKeeps && time < bestFinish)));
-                if (better) (bestValue, bestFinish, bestFirst) = (value, time, first);
+                if (better) (bestValue, bestFinish, bestFirst, bestSecond) = (value, time, first, second);
             }
             if (depth == threats.Count) return;
             for (int i = 0; i < threats.Count; i++)
@@ -336,24 +348,34 @@ public sealed class BarBlockDetector
                 if (used[i]) continue;
                 var t = threats[i];
                 double offset = ToNearestBar(t.Angle, angle, _action.BarCount);
-                double turn = Math.Max(0, Math.Abs(offset) - reach);
+                double move = Math.Max(0, Math.Abs(offset) - reach);
+                double turn = Math.Max(0, move - (offset > 0 ? freeUp : freeDown));
                 double arrive = time + turn / speed;
                 if (arrive > t.SecondsToEscape) continue; // cannot get there in time: not in this plan
                 // Got there: the bar now sits with the target just inside its near end, until it arrives.
-                double sitAt = angle + Math.Sign(offset) * turn;
+                double sitAt = angle + Math.Sign(offset) * move;
+                double centred = angle + offset, drift = speed * (t.SecondsToEscape - arrive);
                 used[i] = true;
-                Search(depth + 1, sitAt, Math.Max(arrive, t.SecondsToEscape), value + Weight(t), first ?? t);
+                Search(depth + 1, sitAt, Math.Min(centred + reach - sitAt, drift), Math.Min(sitAt - (centred - reach), drift),
+                    Math.Max(arrive, t.SecondsToEscape), value + Weight(t), first ?? t, first is null ? null : second ?? t);
                 used[i] = false;
             }
         }
-        Search(0, bar, 0, 0, null);
+        Search(0, bar, 0, 0, 0, 0, null, null);
 
+        PlannedNext = bestSecond;
         if (bestFirst is not null) return bestFirst;
         return _threats.OrderBy(t => t.SecondsToEscape).First();
 
         static bool Same(BarThreat? a, BarThreat? b) =>
             a is not null && b is not null && a.Target == b.Target && Math.Abs(Wrap(a.Angle - b.Angle)) <= 6;
     }
+
+    /// <summary>
+    /// After <see cref="Choose"/>: the one the plan deals with after the one returned, if any. While
+    /// the bar waits on the first, it can drift (keeping the first covered) towards this one.
+    /// </summary>
+    public BarThreat? PlannedNext { get; private set; }
 
     /// <summary>At most this many threats are planned for at once (the soonest to escape).</summary>
     private const int MaxPlanned = 6;

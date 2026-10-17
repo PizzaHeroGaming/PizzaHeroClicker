@@ -180,6 +180,42 @@ public class BarBlockDetectorTests
     }
 
     [Fact]
+    public void AGlowWhereABallMeetsTheCircleIsNotTakenForAValuableOne()
+    {
+        // A common ball flies out and meets the circle; where it lands, something of a more valuable
+        // kind's colour shows for a moment (a bar lighting up, a splash). It was never seen flying
+        // out from the middle, so it is not something to steer for.
+        var detector = new BarBlockDetector(ShieldGame.Action());
+        for (long ms = 0; ms <= 2200; ms += 100)
+        {
+            var still = ShieldGame.Backdrop();
+            ShieldGame.Bar(still, 0);
+            detector.Look(still, ms);
+        }
+        for (long ms = 2230; ms <= 3400; ms += 30)
+        {
+            var frame = ShieldGame.Backdrop();
+            ShieldGame.Bar(frame, 0);
+            double out_ = 40 + (ms - 2230) * 0.12;
+            if (out_ < 120) ShieldGame.Ball(frame, 128, out_, ShieldGame.White, ShieldGame.Cyan);
+            else ShieldGame.Ball(frame, 129, 124, 0x70F070, ShieldGame.White);
+            detector.Look(frame, ms);
+            Assert.DoesNotContain(detector.Threats, t => t.Target == 0);
+        }
+    }
+
+    [Fact]
+    public void WhileWaitingOnOneItKnowsWhichComesNext()
+    {
+        // A common ball about to arrive by the bar, and a valuable one coming out further round:
+        // block the first, and the plan knows the second is next (to drift towards it meanwhile).
+        var detector = TwoBalls(90, (95, 102, ShieldGame.White, ShieldGame.Cyan), (160, 32, ShieldGame.Yellow, ShieldGame.White));
+        var choice = detector.Choose(degreesPerSecond: 128);
+        Assert.Equal(3, choice!.Target);
+        Assert.Equal(2, detector.PlannedNext?.Target);
+    }
+
+    [Fact]
     public void NoBarNoAngle()
     {
         var detector = new BarBlockDetector(ShieldGame.Action());
