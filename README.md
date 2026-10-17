@@ -240,7 +240,10 @@ it to block them.
    more, the arrow moves one up, and each can be given a name.
 5. **TEST ON THE SCREEN NOW** watches for three seconds and says whether it can see the bar and what
    it sees flying out. No keys are pressed.
-6. Optionally **SNIP A START / STOP MARKER**. Steering waits for it, stops the moment it goes, and
+6. If the game has more than one bar going round together, evenly spaced (a second one opposite
+   the first, say), set **Bars** to how many. Only the bar you picked is looked for; each thing is
+   blocked with whichever bar is nearest, so less turning is needed.
+7. Optionally **SNIP A START / STOP MARKER**. Steering waits for it, stops the moment it goes, and
    ends half a second later. Or set **Keep steering for** to the game's length.
 
 While it runs it finds the bar on its circle and the things flying out (they are told apart from the

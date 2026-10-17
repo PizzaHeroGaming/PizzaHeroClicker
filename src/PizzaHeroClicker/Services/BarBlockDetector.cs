@@ -327,11 +327,12 @@ public sealed class BarBlockDetector
             {
                 if (used[i]) continue;
                 var t = threats[i];
-                double turn = Math.Max(0, Math.Abs(Wrap(t.Angle - angle)) - reach);
+                double offset = ToNearestBar(t.Angle, angle, _action.BarCount);
+                double turn = Math.Max(0, Math.Abs(offset) - reach);
                 double arrive = time + turn / speed;
                 if (arrive > t.SecondsToEscape) continue; // cannot get there in time: not in this plan
                 // Got there: the bar now sits with the target just inside its near end, until it arrives.
-                double sitAt = turn <= 0 ? angle : t.Angle - Math.Sign(Wrap(t.Angle - angle)) * reach;
+                double sitAt = angle + Math.Sign(offset) * turn;
                 used[i] = true;
                 Search(depth + 1, sitAt, Math.Max(arrive, t.SecondsToEscape), value + Weight(t), first ?? t);
                 used[i] = false;
@@ -350,6 +351,21 @@ public sealed class BarBlockDetector
     private const int MaxPlanned = 6;
     /// <summary>Each step up the list of kinds counts this many times as much as the one below it.</summary>
     private const double KindWeight = 3;
+
+    /// <summary>
+    /// How far to turn (signed, degrees) to bring the nearest of <paramref name="bars"/> evenly
+    /// spaced bars, the first at <paramref name="barAngle"/>, onto <paramref name="target"/>.
+    /// </summary>
+    public static double ToNearestBar(double target, double barAngle, int bars)
+    {
+        double step = 360.0 / Math.Max(1, bars), best = double.MaxValue;
+        for (int k = 0; k < Math.Max(1, bars); k++)
+        {
+            double d = Wrap(target - (barAngle + k * step));
+            if (Math.Abs(d) < Math.Abs(best)) best = d;
+        }
+        return best;
+    }
 
     /// <summary>An angle difference brought into -180..180 degrees.</summary>
     public static double Wrap(double degrees)

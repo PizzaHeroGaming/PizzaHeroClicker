@@ -1166,7 +1166,7 @@ public sealed class ClickEngine : IDisposable
                     }
                     else
                     {
-                        double error = BarBlockDetector.Wrap(threat.Angle - barNow);
+                        double error = BarBlockDetector.ToNearestBar(threat.Angle, barNow, a.BarCount);
                         Note($"  steering for kind {threat.Target + 1} at {threat.Angle:0} deg; bar now about {barNow:0} deg; {error:+0;-0} deg to go");
                         int way = Math.Sign(error);
                         // Close enough once it is safely within the bar's span: a long bar need not

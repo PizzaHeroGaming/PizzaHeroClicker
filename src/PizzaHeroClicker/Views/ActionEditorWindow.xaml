@@ -122,6 +122,12 @@
           <TextBox Style="{StaticResource NumBox}" Width="80" Text="{Binding WatchForMs, UpdateSourceTrigger=PropertyChanged}" />
           <TextBlock Style="{StaticResource Unit}" Text="ms  (0 = until the marker goes)" />
         </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Bars" />
+          <TextBox Style="{StaticResource NumBox}" Width="52" Text="{Binding BarCount, UpdateSourceTrigger=PropertyChanged}"
+                   ToolTip="How many bars go round the circle together, evenly spaced: 2 means a second one opposite the first. Only the bar you picked is looked for; the others are taken to be where the spacing puts them, and whichever is nearest blocks each thing." />
+          <TextBlock Style="{StaticResource Unit}" Text="moving together, evenly spaced (2 = one opposite the other)" />
+        </StackPanel>
         <StackPanel Style="{StaticResource Row}" Margin="0">
           <TextBlock Style="{StaticResource Lbl}" Text="Lined up within" />
           <TextBox Style="{StaticResource NumBox}" Width="52" Text="{Binding AimToleranceDegrees, UpdateSourceTrigger=PropertyChanged}" />

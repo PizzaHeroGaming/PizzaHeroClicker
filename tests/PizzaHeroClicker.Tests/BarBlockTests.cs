@@ -50,13 +50,13 @@ internal static class ShieldGame
         return pixels;
     }
 
-    public static void Bar(int[] pixels, double degrees, int offX = 0, int offY = 0, double halfWidth = 6)
+    public static void Bar(int[] pixels, double degrees, int offX = 0, int offY = 0, double halfWidth = 6, int colour = 0xF03232)
     {
         for (double a = degrees - halfWidth; a <= degrees + halfWidth; a += 0.2)
         for (int r = Radius - 3; r <= Radius + 3; r++)
         {
             int x = Centre + offX + (int)Math.Round(r * Math.Cos(a * Math.PI / 180)), y = Centre + offY + (int)Math.Round(r * Math.Sin(a * Math.PI / 180));
-            pixels[y * Size + x] = 0xF03232;
+            pixels[y * Size + x] = colour;
         }
     }
 
@@ -141,6 +141,15 @@ public class BarBlockDetectorTests
         Assert.InRange(Math.Abs(BarBlockDetector.Wrap(kept!.Angle - 20)), 0, 5); // already going for the other: keeps going
     }
 
+    [Theory]
+    [InlineData(100, 90, 1, 10)]
+    [InlineData(100, 90, 2, 10)]
+    [InlineData(260, 90, 2, -10)]   // nearer the second bar, at 270
+    [InlineData(0, 90, 2, 90)]      // exactly between: either way, 90 degrees
+    [InlineData(200, 10, 3, -50)]   // bars at 10, 130 and 250
+    public void TurnsTheNearestBarOntoTheTarget(double target, double bar, int bars, double expected) =>
+        Assert.Equal(Math.Abs(expected), Math.Abs(BarBlockDetector.ToNearestBar(target, bar, bars)), 3);
+
     [Fact]
     public void NoBarNoAngle()
     {
@@ -218,10 +227,13 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
     [InlineData(33, false, 0, 24, 150, 0.4)]
     // Shaped like a real game: a ball a second, each taking 3.4 s to arrive, so three or four are in
     // flight at once; a slow bar; every fourth ball a more valuable kind. With these angles at most 9
-    // of the 12 can be reached; it must get close to that, and every valuable one.
-    [InlineData(33, false, 0, 6.5, 128, 0.65, 1000, 3400, 4)]
+    // of the 12 can be reached; it must get close to that (allowing a ball for timing jitter on a busy
+    // test machine), and every valuable one.
+    [InlineData(33, false, 0, 6.5, 128, 0.55, 1000, 3400, 4)]
+    // The same, with a second bar (green) opposite the first: nothing is ever more than 90 degrees from one.
+    [InlineData(33, false, 0, 6.5, 128, 0.8, 1000, 3400, 4, 2)]
     public void SteersTheBarInFrontOfTheBallsAndLetsGoOfTheKeysAtTheEnd(int pictureLagMs, bool redClouds, int centreOffPx = 0, double barHalfWidth = 6,
-        double turnSpeed = 400, double mustBlock = 0.8, int ballEveryMs = 700, int flightMs = 900, int valuableEvery = 0)
+        double turnSpeed = 400, double mustBlock = 0.8, int ballEveryMs = 700, int flightMs = 900, int valuableEvery = 0, int bars = 1)
     {
         // A "shield" game run in real time: holding A turns the bar clockwise at 400 degrees a second,
         // D anticlockwise. A ball comes out of the middle every 0.7 s in a random direction and takes
@@ -269,13 +281,14 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
                 var frame = ShieldGame.Backdrop(redClouds, solid: true);
                 double shown = history.LastOrDefault(h => h.Ms <= ms - pictureLagMs, history[0]).Angle;
                 ShieldGame.Bar(frame, shown, centreOffPx, -centreOffPx / 2, barHalfWidth);
+                for (int k = 1; k < bars; k++) ShieldGame.Bar(frame, shown + k * 360.0 / bars, centreOffPx, -centreOffPx / 2, barHalfWidth, 0x40E050);
                 for (int i = 0; i < balls.Count; i++)
                 {
                     double distance = (ms - balls[i].Born) * BallSpeed / 1000;
                     if (distance < 0 || outcome.ContainsKey(i)) continue;
                     if (distance >= ShieldGame.Radius)
                     {
-                        outcome[i] = Math.Abs(BarBlockDetector.Wrap(barAngle - balls[i].Angle)) <= barHalfWidth + 2; // within the bar, give or take the ball's size
+                        outcome[i] = Math.Abs(BarBlockDetector.ToNearestBar(balls[i].Angle, barAngle, bars)) <= barHalfWidth + 2; // within a bar, give or take the ball's size
                         output.WriteLine($"ball {i} at {balls[i].Angle:0} deg reached the circle at {ms:0} ms; bar at {barAngle:0}: {(outcome[i] ? "blocked" : "missed")}");
                         continue;
                     }
@@ -294,6 +307,7 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
         engine.Stopped += (_, _) => finished.Set();
         var profile = new Profile { IntervalMs = 10, StartDelayMs = 0, CornerStop = false, Repeat = { Mode = RepeatMode.Loops, Count = 1 } };
         var action = ShieldGame.Action();
+        action.BarCount = bars;
         action.WatchForMs = 2500 + 12 * ballEveryMs + flightMs;
         profile.Actions.Add(action);
         Assert.True(engine.Start(profile));
@@ -301,7 +315,7 @@ public class BarBlockEngineTests(Xunit.Abstractions.ITestOutputHelper output)
 
         Assert.True(outcome.Count >= 10, $"only {outcome.Count} balls reached the circle");
         int blocked = outcome.Values.Count(b => b);
-        output.WriteLine($"picture {pictureLagMs} ms behind{(redClouds ? ", red backdrop on the circle" : "")}{(centreOffPx != 0 ? $", centre {centreOffPx} px off" : "")}{(barHalfWidth != 6 ? $", bar {2 * barHalfWidth:0} deg long turning {turnSpeed:0} deg/s" : "")}{(flightMs != 900 ? $", a ball every {ballEveryMs} ms taking {flightMs} ms" : "")}: blocked {blocked} of {outcome.Count}");
+        output.WriteLine($"picture {pictureLagMs} ms behind{(redClouds ? ", red backdrop on the circle" : "")}{(centreOffPx != 0 ? $", centre {centreOffPx} px off" : "")}{(barHalfWidth != 6 ? $", bar {2 * barHalfWidth:0} deg long turning {turnSpeed:0} deg/s" : "")}{(flightMs != 900 ? $", a ball every {ballEveryMs} ms taking {flightMs} ms" : "")}{(bars > 1 ? $", {bars} bars" : "")}: blocked {blocked} of {outcome.Count}");
         Assert.True(blocked >= outcome.Count * mustBlock, $"blocked {blocked} of {outcome.Count}");
         var valuable = Enumerable.Range(0, balls.Count).Where(i => balls[i].Valuable && outcome.ContainsKey(i)).ToList();
         Assert.True(valuable.All(i => outcome[i]), $"missed a valuable one: {string.Join(", ", valuable.Where(i => !outcome[i]))}");

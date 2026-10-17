@@ -58,6 +58,13 @@ public partial class BarBlockAction : ActionBase, IHasMarker
     /// <summary>Close enough: within this many degrees of the target the bar is left where it is.</summary>
     [ObservableProperty] private int _aimToleranceDegrees = 3;
 
+    /// <summary>
+    /// How many bars travel round the circle together, evenly spaced (2 = one opposite the other).
+    /// Only the bar that was picked is looked for; the others are where the spacing puts them, and
+    /// whichever is nearest is used to block each thing.
+    /// </summary>
+    [ObservableProperty] private int _barCount = 1;
+
     /// <summary>Keep steering for this long. 0 = until the marker goes (or for ever without one).</summary>
     [ObservableProperty] private int _watchForMs;
     /// <summary>How often to look, in milliseconds.</summary>
@@ -81,7 +88,7 @@ public partial class BarBlockAction : ActionBase, IHasMarker
     public override string TypeName => "Block";
 
     public override string Summary =>
-        $"Steer a bar round ({CentreX}, {CentreY}), {Radius} px out, with {ClockwiseKey.Display} / {AnticlockwiseKey.Display}"
+        $"Steer {(BarCount == 1 ? "a bar" : $"{BarCount} bars")} round ({CentreX}, {CentreY}), {Radius} px out, with {ClockwiseKey.Display} / {AnticlockwiseKey.Display}"
         + (HasAnchor ? " while its marker shows" : "")
         + (WatchForMs > 0 ? $" for {(HasAnchor ? "up to " : "")}{WatchForMs / 1000.0:0.#} s" : "")
         + (Targets.Count == 0 ? ": nothing to block yet" : $": block {string.Join(", ", Targets.Select(t => t.Name.Length > 0 ? t.Name : t.Color))}");
@@ -105,6 +112,7 @@ public partial class BarBlockAction : ActionBase, IHasMarker
         InnerRadius = Math.Clamp(InnerRadius, 0, Radius - 10);
         BarTolerance = Math.Clamp(BarTolerance, 0, 255);
         AimToleranceDegrees = Math.Clamp(AimToleranceDegrees, 1, 45);
+        BarCount = Math.Clamp(BarCount, 1, 8);
         WatchForMs = Math.Max(0, WatchForMs);
         PollMs = Math.Clamp(PollMs, 5, 1000);
         foreach (var target in Targets)
