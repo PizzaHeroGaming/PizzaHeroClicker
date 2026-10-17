@@ -908,6 +908,7 @@ public sealed class ClickEngine : IDisposable
 
     private int _releasedAll; // counts the times Housekeeping let go of every key, so a holder knows its key is up
     private const double UnseenBarMs = 1500;   // how long to steer by reckoning alone while the bar cannot be seen
+    private const double LastMomentSeconds = 0.3; // this close to arriving, a target the bar already covers is left alone
 
     /// <summary>
     /// Steers a bar round its circle to block what flies out from the centre (see <see cref="BarBlockAction"/>).
@@ -953,7 +954,8 @@ public sealed class ClickEngine : IDisposable
         // how fast, and how far behind the game the captured picture is.
         bool calibrated = false;
         double degreesPerSecond = 180, pictureLagMs = 30;
-        double? lastBar = null;          // the bar's angle when last seen
+        double? lastBar = null;          // the bar's angle when last seen whole
+        double usualBarPixels = 0;       // how many of its pixels show when nothing covers it
         BarThreat? chasing = null;       // what the bar is being steered towards
         long lastBarSeenAt = 0;
         KeyCombo increaseKey = a.ClockwiseKey, decreaseKey = a.AnticlockwiseKey; // screen angles grow clockwise
@@ -1137,7 +1139,12 @@ public sealed class ClickEngine : IDisposable
                 // cannot be seen (passing over backdrop of its own colour, say), from where it was last
                 // seen plus every turn asked for since, for a while: steering on is how it gets clear.
                 double? estimate = null;
-                if (looked && seen is double bar)
+                // A bar only partly in view (something flying over it, often the very thing it is
+                // about to block) seems to sit wherever its visible part is. Don't trust that: reckon.
+                bool wholeBar = detector.BarPixels >= usualBarPixels * 0.6;
+                if (looked && seen is not null && detector.BarPixels > 0)
+                    usualBarPixels = detector.BarPixels > usualBarPixels ? detector.BarPixels : usualBarPixels + (detector.BarPixels - usualBarPixels) * 0.01;
+                if (looked && seen is double bar && (wholeBar || !calibrated || lastBar is null))
                 {
                     (lastBar, lastBarSeenAt) = (bar, lookedAt);
                     estimate = bar + TurnedSince(lookedAt - TimingEngine.MsToTicks(pictureLagMs));
@@ -1176,6 +1183,10 @@ public sealed class ClickEngine : IDisposable
                         if (Math.Abs(error) <= within)
                         {
                             Hold(0);
+                        }
+                        else if (threat.SecondsToEscape < LastMomentSeconds && Math.Abs(error) <= within + BarBlockDetector.EdgeMarginDegrees)
+                        {
+                            Hold(0); // it is arriving now and the bar is covering it: no last-moment corrections
                         }
                         else if (distance > degreesPerSecond * Math.Max(loopMs, a.PollMs) / 1000)
                         {

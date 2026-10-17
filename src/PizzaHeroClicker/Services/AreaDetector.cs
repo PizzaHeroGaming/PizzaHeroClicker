@@ -238,6 +238,9 @@ public sealed class AreaDetector
     private int _signatureBackground = -1;
     private int _minObjectPixels;
     private int _smallestPicturePixels = int.MaxValue;
+    // The longest side of any picture of something to click (pictures are snipped with a margin, so
+    // this is more than any target measures).
+    private int _largestPictureSide;
     /// <summary>Below this <see cref="Blob.CentreCover"/> an object counts as empty in the middle.</summary>
     private const float MaxHollowCover = 0.3f;
     private readonly int _maxObjectPixels;
@@ -280,6 +283,7 @@ public sealed class AreaDetector
             {
                 _appearance.Add((pixels, w, h, i, threshold));
                 largestPicture = Math.Max(largestPicture, w * h);
+                if (!rule.DontClick) _largestPictureSide = Math.Max(_largestPictureSide, Math.Max(w, h));
             }
         }
         _colours = colours.ToArray();
@@ -436,7 +440,11 @@ public sealed class AreaDetector
                 // also looks hollow, but only its bright edges and spots stand out, so it measures
                 // well under the size of its picture. A ring round a satellite is different again:
                 // it is a marker, and the satellite in its middle is what gets clicked.
-                if (blob.Marker < 0 && blob.CentreCover < MaxHollowCover && blob.Pixels >= _smallestPicturePixels)
+                // Or, cut off by the edge of the screen so that less of it shows, when it is taller or
+                // wider than any picture of a target: no target is that big.
+                int extent = Math.Max(blob.Right - blob.Left + 1, blob.Bottom - blob.Top + 1);
+                bool biggerThanAnyTarget = _largestPictureSide > 0 && extent > _largestPictureSide * 1.2;
+                if (blob.Marker < 0 && blob.CentreCover < MaxHollowCover && (blob.Pixels >= _smallestPicturePixels || biggerThanAnyTarget))
                 {
                     hollow++;
                     continue;
