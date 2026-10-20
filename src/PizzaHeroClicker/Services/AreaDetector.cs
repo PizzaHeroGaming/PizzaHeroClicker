@@ -103,6 +103,8 @@ public sealed class AreaReport
     public bool BusyScene;
     /// <summary>Objects passed over for being as big as a target but empty in the middle (a smoke ring).</summary>
     public int Hollow;
+    /// <summary>Things passed over for sitting still where something was just clicked (what is left of it).</summary>
+    public int Remains;
     /// <summary>True while a busy scene is still being learned (nothing can be recognised yet).</summary>
     public bool Learning;
     /// <summary>True when so much of the area differs from the learned scene that the screen itself must have changed.</summary>
@@ -244,6 +246,15 @@ public sealed class AreaDetector
     public void NotifyClicked() => _hasClicked = true;
 
     private readonly List<(int X, int Y)> _clickedSpots = new();
+    // Spots clicked in the last RemainsMs, and when. Against a busy scene, what is left of a target
+    // once it is hit (debris, a smoke cloud) can look enough like a target to be clicked, and that
+    // click hits nothing. It sits where the target was, or drifts slowly; real targets move. So near
+    // one of these, only something seen moving is clicked.
+    private readonly List<(int X, int Y, double Ms)> _justClicked = new();
+    private const double RemainsMs = 1200;
+    /// <summary>Slower than this (pixels a second), near a just-clicked spot, is what is left of the target.</summary>
+    private const double MinTargetSpeed = 40;
+    private double _lastLookMs;
     private const int SameSpotPx = 10;
 
     /// <summary>
@@ -256,6 +267,8 @@ public sealed class AreaDetector
     {
         _hasClicked = true;
         if (!_learnedBusy) return;
+        _justClicked.RemoveAll(c => _lastLookMs - c.Ms > RemainsMs);
+        _justClicked.Add((x, y, _lastLookMs));
         if (_clickedSpots.Any(s => Math.Abs(s.X - x) <= SameSpotPx && Math.Abs(s.Y - y) <= SameSpotPx))
         {
             if (!_stillSpots.Any(s => Math.Abs(s.X - x) <= StillSpotRadius && Math.Abs(s.Y - y) <= StillSpotRadius))
@@ -374,7 +387,8 @@ public sealed class AreaDetector
         var report = CollectReport ? new AreaReport() : null;
         LastReport = report;
 
-        (int Key, int X, int Y, int Rule)? best = null;
+        _lastLookMs = lookMs;
+        _candidates.Clear();
         void Offer(int x, int y, int rule)
         {
             if (_action.Rules[rule].DontClick) return; // looks most like something to leave alone
@@ -390,8 +404,7 @@ public sealed class AreaDetector
                     if (Math.Abs(x - ax) <= AvoidRadius && Math.Abs(y - ay) <= AvoidRadius) return; // just clicked there
                 }
             }
-            int key = AreaScanner.PriorityKey(priority, x, y, width, height);
-            if (best is null || key < best.Value.Key) best = (key, x, y, rule);
+            _candidates.Add((AreaScanner.PriorityKey(priority, x, y, width, height), x, y, rule));
         }
 
         // ---- colours
@@ -562,8 +575,17 @@ public sealed class AreaDetector
             }
         }
 
-        (int X, int Y, int Rule)? target = best is var (_, bx, by, brule) ? (bx, by, brule) : null;
         _tracker.Update(_offers, lookMs);
+        (int Key, int X, int Y, int Rule)? best = null;
+        int remains = 0;
+        foreach (var c in _candidates)
+        {
+            if (best is not null && c.Key >= best.Value.Key) continue;
+            if (IsRemains(c.X, c.Y, lookMs)) { remains++; continue; }
+            best = c;
+        }
+        if (report is not null) report.Remains = remains;
+        (int X, int Y, int Rule)? target = best is var (_, bx, by, brule) ? (bx, by, brule) : null;
         TargetVelocity = target is var (tx, ty, _) ? _tracker.VelocityOf(tx, ty) : (0, 0);
         // Against a busy, moving scene the targets are the things that move. Something that stays in
         // one spot is part of the game's display, and is left alone from now on. (On a plain
@@ -578,6 +600,24 @@ public sealed class AreaDetector
         }
         if (report is not null) report.Target = target;
         return target;
+    }
+
+    private readonly List<(int Key, int X, int Y, int Rule)> _candidates = new();
+
+    /// <summary>
+    /// Near a spot clicked a moment ago and not seen moving: what is left of what was clicked.
+    /// </summary>
+    private bool IsRemains(int x, int y, double nowMs)
+    {
+        bool nearHit = false;
+        foreach (var (cx, cy, ms) in _justClicked)
+        {
+            if (nowMs - ms > RemainsMs || nowMs < ms) continue;
+            if (Math.Abs(x - cx) <= AvoidRadius && Math.Abs(y - cy) <= AvoidRadius) { nearHit = true; break; }
+        }
+        if (!nearHit) return false;
+        var (vx, vy) = _tracker.VelocityOf(x, y);
+        return Math.Sqrt(vx * vx + vy * vy) < MinTargetSpeed;
     }
 
     private static bool TouchesEdge(Blob blob, int width, int height)
@@ -639,6 +679,7 @@ public sealed class AreaDetector
                 ? $"Busy backdrop: finding things by their movement.  Moving objects seen: {report.ObjectsFound}."
                 : $"Plain backdrop, colour {report.Background}.  Separate objects seen in the area: {report.ObjectsFound}.");
             if (report.Learning) text.AppendLine("Still learning what the scene looks like (takes about two seconds).");
+            if (report.Remains > 0) text.AppendLine($"Passed over {report.Remains} thing{(report.Remains == 1 ? "" : "s")} sitting still right where something was just clicked (what is left of it: debris, smoke): only something seen moving there is clicked.");
             if (report.Hollow > 0) text.AppendLine($"Passed over {report.Hollow} object{(report.Hollow == 1 ? "" : "s")} as big as a target but empty in the middle (a ring of smoke, say): a click there would hit nothing.");
             if (_stillSpots.Count > 0)
                 text.AppendLine($"Ignoring {_stillSpots.Count} spot{(_stillSpots.Count == 1 ? "" : "s")} where something stayed put while the scene moved (part of the game's display, not a target): "

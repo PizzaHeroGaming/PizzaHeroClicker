@@ -210,6 +210,8 @@ watch plays for that long, and the run stops.
   counters and buttons out of the watched area where you can.
 - Something as big as a target but empty in the middle (the ring of smoke an explosion leaves) is
   not clicked: a click at its centre would land on nothing.
+- For 1.2 s after a click, something sitting still near that spot (the debris a destroyed target
+  leaves, say) is not clicked. Only something seen moving there is: real targets move.
 - A picture or colour can be set to **Don't click** (in its "click with" list). Things that look
   more like that picture than like any target are left alone: useful for things a game shows that
   resemble its targets.

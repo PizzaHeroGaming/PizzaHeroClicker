@@ -3,7 +3,7 @@
 ; Needs Inno Setup 6.3 or newer: https://jrsoftware.org/isinfo.php
 
 #ifndef AppVersion
-  #define AppVersion "1.4.14"
+  #define AppVersion "1.4.15"
 #endif
 #define AppName "Pizza Hero Clicker"
 #define AppExe "PizzaHeroClicker.exe"

@@ -360,6 +360,35 @@ public class SceneTests
     }
 
     [Fact]
+    public void WhatIsLeftWhereATargetWasJustClickedIsNotClickedButSomethingMovingThereIs()
+    {
+        var detector = new AreaDetector(Watch());
+        // A rock crosses the scene and is clicked at 2.5 s (it is destroyed: gone from then on).
+        // Half a second later, something rock-like sits 30 px from where it was: its debris.
+        // A little after that, a real rock flies through the same spot.
+        (int X, int Y, int Rule)? Look(long ms, Action<int[]> draw)
+        {
+            var frame = Scene();
+            draw(frame);
+            return detector.Find(frame, ms);
+        }
+        for (long ms = 0; ms <= 2500; ms += 25)
+            Look(ms, f => DrawRock(f, 40 + (int)(ms * 0.12), 200));
+        var hit = Look(2500, f => DrawRock(f, 340, 200));
+        Assert.NotNull(hit);
+        detector.NotifyClicked(hit.Value.X, hit.Value.Y);
+
+        for (long ms = 2525; ms < 2950; ms += 25) Look(ms, _ => { });
+        for (long ms = 2950; ms <= 3400; ms += 25)
+            Assert.True(Look(ms, f => DrawRock(f, 370, 175)) is null, $"the debris was clicked at {ms} ms");
+
+        bool found = false;
+        for (long ms = 3425; ms <= 3700 && !found; ms += 25)
+            found = Look(ms, f => { DrawRock(f, 370, 175); DrawRock(f, 300 + (int)((ms - 3425) * 0.15), 230); }) is { } t && t.X < 360;
+        Assert.True(found, "a rock moving past the just-clicked spot was not clicked");
+    }
+
+    [Fact]
     public void SomethingThatStopsBecomesPartOfTheScene()
     {
         var detector = new AreaDetector(Watch());
