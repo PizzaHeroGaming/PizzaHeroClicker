@@ -128,6 +128,12 @@
                    ToolTip="How many bars go round the circle together, evenly spaced: 2 means a second one opposite the first. Only the bar you picked is looked for; the others are taken to be where the spacing puts them, and whichever is nearest blocks each thing." />
           <TextBlock Style="{StaticResource Unit}" Text="moving together, evenly spaced (2 = one opposite the other)" />
         </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+          <TextBlock Style="{StaticResource Lbl}" Text="Other bars at" />
+          <TextBox Style="{StaticResource NumBox}" Width="110" Text="{Binding OtherBars, UpdateSourceTrigger=PropertyChanged}"
+                   ToolTip="Only if the bars are NOT evenly spaced: where each other bar sits, in degrees clockwise round from the one you picked, separated by commas. For example 90, 180: one a quarter turn on, one opposite. When this is filled in, it decides the bars and the Bars number is not used." />
+          <TextBlock Style="{StaticResource Unit}" Text="degrees clockwise from yours, e.g. 90, 180 (empty = evenly spaced)" />
+        </StackPanel>
         <StackPanel Style="{StaticResource Row}" Margin="0">
           <TextBlock Style="{StaticResource Lbl}" Text="Lined up within" />
           <TextBox Style="{StaticResource NumBox}" Width="52" Text="{Binding AimToleranceDegrees, UpdateSourceTrigger=PropertyChanged}" />

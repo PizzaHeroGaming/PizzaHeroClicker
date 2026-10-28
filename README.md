@@ -244,7 +244,9 @@ it to block them.
    it sees flying out. No keys are pressed.
 6. If the game has more than one bar going round together, evenly spaced (a second one opposite
    the first, say), set **Bars** to how many. Only the bar you picked is looked for; each thing is
-   blocked with whichever bar is nearest, so less turning is needed.
+   blocked with whichever bar is nearest, so less turning is needed. If they are not evenly spaced,
+   fill in **Other bars at** instead: each other bar's place in degrees clockwise round from the
+   one you picked (for example `90, 180`).
 7. Optionally **SNIP A START / STOP MARKER**. Steering waits for it, stops the moment it goes, and
    ends half a second later. Or set **Keep steering for** to the game's length.
 

@@ -326,6 +326,7 @@ public sealed class BarBlockDetector
         // The soonest few: with more than this in flight, the later ones can wait for the next look.
         var threats = _threats.OrderBy(t => t.SecondsToEscape).Take(MaxPlanned).ToList();
         int kinds = Math.Max(1, _action.Targets.Count);
+        var bars = _action.BarOffsets();
         double Weight(BarThreat t) => Math.Pow(KindWeight, kinds - 1 - Math.Clamp(t.Target, 0, kinds - 1));
 
         BarThreat? bestFirst = null, bestSecond = null;
@@ -352,7 +353,7 @@ public sealed class BarBlockDetector
             {
                 if (used[i]) continue;
                 var t = threats[i];
-                double offset = ToNearestBar(t.Angle, angle, _action.BarCount);
+                double offset = ToNearestBar(t.Angle, angle, bars);
                 double move = Math.Max(0, Math.Abs(offset) - reach);
                 double turn = Math.Max(0, move - (offset > 0 ? freeUp : freeDown));
                 double arrive = time + (turn > 0 && depth > 0 ? restartSeconds : 0) + turn / speed;
@@ -391,12 +392,19 @@ public sealed class BarBlockDetector
     /// How far to turn (signed, degrees) to bring the nearest of <paramref name="bars"/> evenly
     /// spaced bars, the first at <paramref name="barAngle"/>, onto <paramref name="target"/>.
     /// </summary>
-    public static double ToNearestBar(double target, double barAngle, int bars)
+    public static double ToNearestBar(double target, double barAngle, int bars) =>
+        ToNearestBar(target, barAngle, Enumerable.Range(0, Math.Max(1, bars)).Select(k => k * 360.0 / Math.Max(1, bars)).ToArray());
+
+    /// <summary>
+    /// As above, with the bars at <paramref name="offsets"/> degrees clockwise round from the one at
+    /// <paramref name="barAngle"/> (which is offset 0).
+    /// </summary>
+    public static double ToNearestBar(double target, double barAngle, IReadOnlyList<double> offsets)
     {
-        double step = 360.0 / Math.Max(1, bars), best = double.MaxValue;
-        for (int k = 0; k < Math.Max(1, bars); k++)
+        double best = Wrap(target - barAngle);
+        foreach (double o in offsets)
         {
-            double d = Wrap(target - (barAngle + k * step));
+            double d = Wrap(target - (barAngle + o));
             if (Math.Abs(d) < Math.Abs(best)) best = d;
         }
         return best;

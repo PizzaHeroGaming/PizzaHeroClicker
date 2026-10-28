@@ -65,6 +65,37 @@ public partial class BarBlockAction : ActionBase, IHasMarker
     /// </summary>
     [ObservableProperty] private int _barCount = 1;
 
+    /// <summary>
+    /// Where the other bars sit when they are not evenly spaced: degrees clockwise round from the
+    /// picked bar, separated by commas ("90, 180"). Empty: <see cref="BarCount"/> bars, evenly spaced.
+    /// </summary>
+    [ObservableProperty] private string _otherBars = "";
+
+    /// <summary>
+    /// Every bar's place, in degrees clockwise from the picked bar (which is 0, and always first):
+    /// from <see cref="OtherBars"/> when it gives any, otherwise <see cref="BarCount"/> evenly spaced.
+    /// </summary>
+    public double[] BarOffsets()
+    {
+        var given = ParseOtherBars(OtherBars);
+        if (given.Count > 0) return [0, .. given];
+        int count = Math.Max(1, BarCount);
+        return Enumerable.Range(0, count).Select(k => k * 360.0 / count).ToArray();
+    }
+
+    /// <summary>The angles in an "other bars" list, each brought into 0..360; anything unreadable, or 0, is left out.</summary>
+    public static List<double> ParseOtherBars(string? text)
+    {
+        var angles = new List<double>();
+        foreach (var part in (text ?? "").Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!double.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double a)) continue;
+            a = (a % 360 + 360) % 360;
+            if (a > 0.5 && a < 359.5 && !angles.Any(b => Math.Abs(b - a) < 0.5)) angles.Add(a);
+        }
+        return angles;
+    }
+
     /// <summary>Keep steering for this long. 0 = until the marker goes (or for ever without one).</summary>
     [ObservableProperty] private int _watchForMs;
     /// <summary>How often to look, in milliseconds.</summary>
@@ -88,7 +119,7 @@ public partial class BarBlockAction : ActionBase, IHasMarker
     public override string TypeName => "Block";
 
     public override string Summary =>
-        $"Steer {(BarCount == 1 ? "a bar" : $"{BarCount} bars")} round ({CentreX}, {CentreY}), {Radius} px out, with {ClockwiseKey.Display} / {AnticlockwiseKey.Display}"
+        $"Steer {(BarOffsets().Length is var bars && bars == 1 ? "a bar" : $"{bars} bars")} round ({CentreX}, {CentreY}), {Radius} px out, with {ClockwiseKey.Display} / {AnticlockwiseKey.Display}"
         + (HasAnchor ? " while its marker shows" : "")
         + (WatchForMs > 0 ? $" for {(HasAnchor ? "up to " : "")}{WatchForMs / 1000.0:0.#} s" : "")
         + (Targets.Count == 0 ? ": nothing to block yet" : $": block {string.Join(", ", Targets.Select(t => t.Name.Length > 0 ? t.Name : t.Color))}");
@@ -113,6 +144,7 @@ public partial class BarBlockAction : ActionBase, IHasMarker
         BarTolerance = Math.Clamp(BarTolerance, 0, 255);
         AimToleranceDegrees = Math.Clamp(AimToleranceDegrees, 1, 45);
         BarCount = Math.Clamp(BarCount, 1, 8);
+        OtherBars ??= "";
         WatchForMs = Math.Max(0, WatchForMs);
         PollMs = Math.Clamp(PollMs, 5, 1000);
         foreach (var target in Targets)
