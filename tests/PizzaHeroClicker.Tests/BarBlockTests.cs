@@ -242,6 +242,18 @@ public class BarBlockDetectorTests
     }
 
     [Fact]
+    public void WithUnevenBarsTheShortWayRoundIsTaken()
+    {
+        // Bars at 0, 90 and 180 round from the picked one, which is at 65. Something is coming out at
+        // 230: the blue bar (at 155) could turn 75 degrees on to it, but the green one (at 245) is
+        // only 15 back. Both arrive in time on paper; the short way is the one to take.
+        var detector = TwoBalls(65, (230, 40, ShieldGame.Yellow, ShieldGame.White), (330, 20, ShieldGame.White, ShieldGame.Cyan), "90, 180");
+        var choice = detector.Choose(degreesPerSecond: 128);
+        Assert.Equal(2, choice!.Target);
+        Assert.Equal(180, detector.PlannedBar);
+    }
+
+    [Fact]
     public void NoBarNoAngle()
     {
         var detector = new BarBlockDetector(ShieldGame.Action());
@@ -253,9 +265,11 @@ public class BarBlockDetectorTests
     /// Learns the backdrop with the bar at <paramref name="bar"/>, then shows two balls flying out at
     /// 60 px a second and returns the detector as it stands after the last look.
     /// </summary>
-    private static BarBlockDetector TwoBalls(double bar, (double Angle, double From, int Ring, int Middle) a, (double Angle, double From, int Ring, int Middle) b)
+    private static BarBlockDetector TwoBalls(double bar, (double Angle, double From, int Ring, int Middle) a, (double Angle, double From, int Ring, int Middle) b, string otherBars = "")
     {
-        var detector = new BarBlockDetector(ShieldGame.Action());
+        var action = ShieldGame.Action();
+        action.OtherBars = otherBars;
+        var detector = new BarBlockDetector(action);
         for (long ms = 0; ms <= 2200; ms += 100)
         {
             var still = ShieldGame.Backdrop();

@@ -333,7 +333,7 @@ public sealed class BarBlockDetector
 
         BarThreat? bestFirst = null, bestSecond = null;
         double bestFirstBar = 0, bestSecondBar = 0;
-        double bestValue = -1, bestFinish = double.MaxValue;
+        double bestValue = -1, bestFinish = double.MaxValue, bestTurned = double.MaxValue;
         var ways = new double[2];
         var wayBars = new double[2];
         var used = new bool[threats.Count];
@@ -344,19 +344,24 @@ public sealed class BarBlockDetector
         // Each one can be met by the nearest bar either way round. With bars not evenly spaced,
         // which bar is nearest changes as the bar turns, so both are planned for, and the plan
         // says which bar it uses: the steering then sticks to that one.
-        void Search(int depth, double angle, double freeUp, double freeDown, double time, double value,
+        void Search(int depth, double angle, double freeUp, double freeDown, double time, double value, double turned,
             BarThreat? first, double firstBar, BarThreat? second, double secondBar)
         {
             // Every order is scored as far as it goes: stopping early is one of the plans too.
-            // Better = blocks more; then, equally good, starts with what is already being chased;
-            // then finishes sooner.
+            // Better = blocks more. Then, equally good: less turning (a plan that only just works
+            // on paper, the long way round, is the one that arrives late), except that what is
+            // already being chased is kept unless the other way is much less turning (so the bar
+            // does not swap between two near-equal plans and reach neither); then finishes sooner.
             if (first is not null)
             {
-                int keeps = Same(first, current) && firstBar == previousBar ? 1 : 0;
-                int bestKeeps = Same(bestFirst, current) && bestFirstBar == previousBar ? 1 : 0;
-                bool better = value > bestValue + 1e-9
-                    || (value > bestValue - 1e-9 && (keeps > bestKeeps || (keeps == bestKeeps && time < bestFinish)));
-                if (better) (bestValue, bestFinish, bestFirst, bestFirstBar, bestSecond, bestSecondBar) = (value, time, first, firstBar, second, secondBar);
+                bool keeps = Same(first, current) && firstBar == previousBar;
+                bool bestKeeps = Same(bestFirst, current) && bestFirstBar == previousBar;
+                bool better;
+                if (value > bestValue + 1e-9) better = true;
+                else if (value < bestValue - 1e-9) better = false;
+                else if (keeps != bestKeeps) better = keeps ? turned <= bestTurned + KeepWithinDegrees : turned < bestTurned - KeepWithinDegrees;
+                else better = turned < bestTurned - SameTurnDegrees || (turned < bestTurned + SameTurnDegrees && time < bestFinish);
+                if (better) (bestValue, bestFinish, bestTurned, bestFirst, bestFirstBar, bestSecond, bestSecondBar) = (value, time, turned, first, firstBar, second, secondBar);
             }
             if (depth == threats.Count) return;
             for (int i = 0; i < threats.Count; i++)
@@ -377,14 +382,14 @@ public sealed class BarBlockDetector
                     double centred = angle + offset, drift = speed * (t.SecondsToEscape - arrive);
                     used[i] = true;
                     Search(depth + 1, sitAt, Math.Min(centred + reach - sitAt, drift), Math.Min(sitAt - (centred - reach), drift),
-                        Math.Max(arrive, t.SecondsToEscape), value + Weight(t),
+                        Math.Max(arrive, t.SecondsToEscape), value + Weight(t), turned + turn,
                         first ?? t, first is null ? barUsed : firstBar,
                         first is null ? null : second ?? t, first is not null && second is null ? barUsed : secondBar);
                     used[i] = false;
                 }
             }
         }
-        Search(0, bar, 0, 0, 0, 0, null, 0, null, 0);
+        Search(0, bar, 0, 0, 0, 0, 0, null, 0, null, 0);
 
         (PlannedNext, PlannedNextBar) = (bestSecond, bestSecondBar);
         if (bestFirst is not null)
@@ -443,6 +448,10 @@ public sealed class BarBlockDetector
     private const int MaxPlanned = 6;
     /// <summary>Each step up the list of kinds counts this many times as much as the one below it.</summary>
     private const double KindWeight = 3;
+    /// <summary>The plan being followed is kept over an equally good one unless that turns this much less.</summary>
+    private const double KeepWithinDegrees = 15;
+    /// <summary>Plans whose turning differs by less than this count as turning the same (then: finishes sooner).</summary>
+    private const double SameTurnDegrees = 5;
 
     /// <summary>
     /// How far to turn (signed, degrees) to bring the nearest of <paramref name="bars"/> evenly
