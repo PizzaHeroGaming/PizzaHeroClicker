@@ -318,7 +318,9 @@ public sealed class BarBlockDetector
     /// </param>
     public BarThreat? Choose(double degreesPerSecond, double? barAngle = null, BarThreat? current = null, double restartSeconds = 0)
     {
+        double previousBar = PlannedBar;
         PlannedNext = null;
+        (PlannedBar, PlannedNextBar) = (0, 0);
         if (_threats.Count == 0) return null;
         double bar = barAngle ?? BarAngle ?? 0;
         double speed = Math.Max(1, degreesPerSecond);
@@ -330,48 +332,69 @@ public sealed class BarBlockDetector
         double Weight(BarThreat t) => Math.Pow(KindWeight, kinds - 1 - Math.Clamp(t.Target, 0, kinds - 1));
 
         BarThreat? bestFirst = null, bestSecond = null;
+        double bestFirstBar = 0, bestSecondBar = 0;
         double bestValue = -1, bestFinish = double.MaxValue;
+        var ways = new double[2];
+        var wayBars = new double[2];
         var used = new bool[threats.Count];
 
         // freeUp / freeDown: how far the bar can still drift either way, while waiting for the last
         // one in the plan to arrive, without letting it out of the bar's span. A wait spent drifting
         // towards the next one is a head start on it.
-        void Search(int depth, double angle, double freeUp, double freeDown, double time, double value, BarThreat? first, BarThreat? second)
+        // Each one can be met by the nearest bar either way round. With bars not evenly spaced,
+        // which bar is nearest changes as the bar turns, so both are planned for, and the plan
+        // says which bar it uses: the steering then sticks to that one.
+        void Search(int depth, double angle, double freeUp, double freeDown, double time, double value,
+            BarThreat? first, double firstBar, BarThreat? second, double secondBar)
         {
             // Every order is scored as far as it goes: stopping early is one of the plans too.
             // Better = blocks more; then, equally good, starts with what is already being chased;
             // then finishes sooner.
             if (first is not null)
             {
-                int keeps = Same(first, current) ? 1 : 0, bestKeeps = Same(bestFirst, current) ? 1 : 0;
+                int keeps = Same(first, current) && firstBar == previousBar ? 1 : 0;
+                int bestKeeps = Same(bestFirst, current) && bestFirstBar == previousBar ? 1 : 0;
                 bool better = value > bestValue + 1e-9
                     || (value > bestValue - 1e-9 && (keeps > bestKeeps || (keeps == bestKeeps && time < bestFinish)));
-                if (better) (bestValue, bestFinish, bestFirst, bestSecond) = (value, time, first, second);
+                if (better) (bestValue, bestFinish, bestFirst, bestFirstBar, bestSecond, bestSecondBar) = (value, time, first, firstBar, second, secondBar);
             }
             if (depth == threats.Count) return;
             for (int i = 0; i < threats.Count; i++)
             {
                 if (used[i]) continue;
                 var t = threats[i];
-                double offset = ToNearestBar(t.Angle, angle, bars);
-                double move = Math.Max(0, Math.Abs(offset) - reach);
-                double turn = Math.Max(0, move - (offset > 0 ? freeUp : freeDown));
-                double arrive = time + (turn > 0 && depth > 0 ? restartSeconds : 0) + turn / speed;
-                if (arrive > t.SecondsToEscape) continue; // cannot get there in time: not in this plan
-                // Got there: the bar now sits with the target just inside its near end, until it arrives.
-                double sitAt = angle + Math.Sign(offset) * move;
-                double centred = angle + offset, drift = speed * (t.SecondsToEscape - arrive);
-                used[i] = true;
-                Search(depth + 1, sitAt, Math.Min(centred + reach - sitAt, drift), Math.Min(sitAt - (centred - reach), drift),
-                    Math.Max(arrive, t.SecondsToEscape), value + Weight(t), first ?? t, first is null ? null : second ?? t);
-                used[i] = false;
+                int wayCount = Ways(t.Angle, angle, bars, reach, ways, wayBars);
+                var (way0, way1, bar0, bar1) = (ways[0], ways[1], wayBars[0], wayBars[1]); // the arrays are reused deeper down
+                for (int w = 0; w < wayCount; w++)
+                {
+                    double offset = w == 0 ? way0 : way1, barUsed = w == 0 ? bar0 : bar1;
+                    double move = Math.Max(0, Math.Abs(offset) - reach);
+                    double turn = Math.Max(0, move - (offset > 0 ? freeUp : freeDown));
+                    double arrive = time + (turn > 0 && depth > 0 ? restartSeconds : 0) + turn / speed;
+                    if (arrive > t.SecondsToEscape) continue; // cannot get there in time: not in this plan
+                    // Got there: the bar now sits with the target just inside its near end, until it arrives.
+                    double sitAt = angle + Math.Sign(offset) * move;
+                    double centred = angle + offset, drift = speed * (t.SecondsToEscape - arrive);
+                    used[i] = true;
+                    Search(depth + 1, sitAt, Math.Min(centred + reach - sitAt, drift), Math.Min(sitAt - (centred - reach), drift),
+                        Math.Max(arrive, t.SecondsToEscape), value + Weight(t),
+                        first ?? t, first is null ? barUsed : firstBar,
+                        first is null ? null : second ?? t, first is not null && second is null ? barUsed : secondBar);
+                    used[i] = false;
+                }
             }
         }
-        Search(0, bar, 0, 0, 0, 0, null, null);
+        Search(0, bar, 0, 0, 0, 0, null, 0, null, 0);
 
-        PlannedNext = bestSecond;
-        if (bestFirst is not null) return bestFirst;
-        return _threats.OrderBy(t => t.SecondsToEscape).First();
+        (PlannedNext, PlannedNextBar) = (bestSecond, bestSecondBar);
+        if (bestFirst is not null)
+        {
+            PlannedBar = bestFirstBar;
+            return bestFirst;
+        }
+        var soonest = _threats.OrderBy(t => t.SecondsToEscape).First();
+        PlannedBar = NearestBar(soonest.Angle, bar, bars);
+        return soonest;
 
         static bool Same(BarThreat? a, BarThreat? b) =>
             a is not null && b is not null && a.Target == b.Target && Math.Abs(Wrap(a.Angle - b.Angle)) <= 6;
@@ -382,6 +405,39 @@ public sealed class BarBlockDetector
     /// the bar waits on the first, it can drift (keeping the first covered) towards this one.
     /// </summary>
     public BarThreat? PlannedNext { get; private set; }
+
+    /// <summary>
+    /// After <see cref="Choose"/>: which bar (its offset from the picked one, as in
+    /// <see cref="BarBlockAction.BarOffsets"/>) the plan blocks the returned one with, and the next
+    /// one with. Steer that bar onto it: which bar is nearest can change on the way.
+    /// </summary>
+    public double PlannedBar { get; private set; }
+    public double PlannedNextBar { get; private set; }
+
+    /// <summary>
+    /// The ways to meet something at <paramref name="target"/>: with the nearest bar clockwise of it
+    /// and the nearest anticlockwise (just one way if a bar already covers it). Writes each turn and
+    /// the bar it uses; returns how many ways there are.
+    /// </summary>
+    private static int Ways(double target, double barAngle, IReadOnlyList<double> bars, double reach, double[] turns, double[] barsUsed)
+    {
+        double up = double.MaxValue, down = double.MinValue, upBar = 0, downBar = 0;
+        foreach (double o in bars)
+        {
+            double d = Wrap(target - (barAngle + o));
+            if (Math.Abs(d) <= reach) { turns[0] = d; barsUsed[0] = o; return 1; }
+            if (d > 0 && d < up) (up, upBar) = (d, o);
+            if (d < 0 && d > down) (down, downBar) = (d, o);
+        }
+        int n = 0;
+        if (up != double.MaxValue) { turns[n] = up; barsUsed[n++] = upBar; }
+        if (down != double.MinValue) { turns[n] = down; barsUsed[n++] = downBar; }
+        return n;
+    }
+
+    /// <summary>The offset of whichever bar is nearest <paramref name="target"/>.</summary>
+    public static double NearestBar(double target, double barAngle, IReadOnlyList<double> bars) =>
+        bars.Count == 0 ? 0 : bars.MinBy(o => Math.Abs(Wrap(target - (barAngle + o))));
 
     /// <summary>At most this many threats are planned for at once (the soonest to escape).</summary>
     private const int MaxPlanned = 6;

@@ -976,7 +976,6 @@ public sealed class ClickEngine : IDisposable
         // how fast, and how far behind the game the captured picture is.
         bool calibrated = false;
         double degreesPerSecond = 180, pictureLagMs = 30;
-        var barOffsets = a.BarOffsets();
         double? lastBar = null;          // the bar's angle when last seen whole
         double usualBarPixels = 0;       // how many of its pixels show when nothing covers it
         BarThreat? chasing = null;       // what the bar is being steered towards
@@ -1197,8 +1196,8 @@ public sealed class ClickEngine : IDisposable
                     }
                     else
                     {
-                        double error = BarBlockDetector.ToNearestBar(threat.Angle, barNow, barOffsets);
-                        Note($"  steering for kind {threat.Target + 1} at {threat.Angle:0} deg; bar now about {barNow:0} deg; {error:+0;-0} deg to go");
+                        double error = BarBlockDetector.Wrap(threat.Angle - (barNow + detector.PlannedBar));
+                        Note($"  steering for kind {threat.Target + 1} at {threat.Angle:0} deg with the bar at +{detector.PlannedBar:0}; bar now about {barNow:0} deg; {error:+0;-0} deg to go");
                         int way = Math.Sign(error);
                         // Close enough once it is safely within the bar's span: a long bar need not
                         // be centred on it. When moving, aim for halfway between there and dead centre.
@@ -1213,7 +1212,7 @@ public sealed class ClickEngine : IDisposable
                             // place is reckoned, and only a sure place is safe to edge away from.
                             if (detector.PlannedNext is { } next && (threat.SecondsToEscape > LastMomentSeconds || wholeBar))
                             {
-                                int toNext = Math.Sign(BarBlockDetector.ToNearestBar(next.Angle, barNow, barOffsets));
+                                int toNext = Math.Sign(BarBlockDetector.Wrap(next.Angle - (barNow + detector.PlannedNextBar)));
                                 double keep = Math.Max(0, within - DriftMarginDegrees);
                                 double drift = keep + toNext * error; // degrees the bar can move toNext and still cover it
                                 if (toNext != 0 && drift >= 2)
