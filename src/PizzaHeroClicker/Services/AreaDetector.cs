@@ -18,20 +18,100 @@ public static class ScreenAnchor
     /// Share (0..1) of pixels that are about the same in both. Counting matching pixels, rather
     /// than averaging differences, means something drifting across part of the marker only
     /// lowers the score in proportion to what it covers.
+    ///
+    /// A marker is usually a label: light lettering on whatever the game shows behind it, and
+    /// what is behind it can change (a new background as the game moves on). So a marker that
+    /// splits clearly into lettering and backdrop is also compared by its shape alone: which
+    /// pixels are lettering (on the lettering's side of its brightness split) and which are not.
+    /// The better of the two comparisons counts.
     /// </summary>
     public static double Similarity(int[] live, int[] reference)
     {
         int n = Math.Min(live.Length, reference.Length);
         if (n == 0) return 0;
-        int same = 0;
+        var shape = ShapeOf(reference);
+        int same = 0, sameShape = 0;
         for (int i = 0; i < n; i++)
         {
             int a = live[i], b = reference[i];
             if (Math.Abs(((a >> 16) & 0xFF) - ((b >> 16) & 0xFF)) <= Tolerance
                 && Math.Abs(((a >> 8) & 0xFF) - ((b >> 8) & 0xFF)) <= Tolerance
                 && Math.Abs((a & 0xFF) - (b & 0xFF)) <= Tolerance) same++;
+            if (shape is not null && shape.IsInk(a) == shape.Ink[i]) sameShape++;
         }
-        return (double)same / n;
+        return (double)Math.Max(same, sameShape) / n;
+    }
+
+    /// <summary>A marker split into lettering ("ink") and backdrop by brightness. Null if it has no clear split.</summary>
+    private sealed class Shape
+    {
+        public required bool[] Ink;
+        public required int Threshold; // brightness 0..765 (r + g + b)
+        public required bool InkIsBright;
+        public bool IsInk(int pixel)
+        {
+            int v = ((pixel >> 16) & 0xFF) + ((pixel >> 8) & 0xFF) + (pixel & 0xFF);
+            return InkIsBright ? v >= Threshold : v < Threshold;
+        }
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<int[], Shape?[]> Shapes = new();
+    /// <summary>The lettering must stand this far (r + g + b) from the backdrop around it...</summary>
+    private const int MinInkContrast = 180;
+    /// <summary>...and cover between these shares of the marker.</summary>
+    private const double MinInkShare = 0.05, MaxInkShare = 0.6;
+
+    private static Shape? ShapeOf(int[] reference)
+    {
+        var box = Shapes.GetValue(reference, r => [MakeShape(r)]);
+        return box[0];
+    }
+
+    /// <summary>
+    /// Splits the marker in two by brightness where the two halves are most different (Otsu's
+    /// method). The smaller half is the lettering, as long as it stands out clearly.
+    /// </summary>
+    private static Shape? MakeShape(int[] reference)
+    {
+        int n = reference.Length;
+        if (n < MinSide * MinSide) return null;
+        var counts = new int[766];
+        foreach (int p in reference) counts[((p >> 16) & 0xFF) + ((p >> 8) & 0xFF) + (p & 0xFF)]++;
+        double total = 0;
+        for (int v = 0; v < counts.Length; v++) total += (double)v * counts[v];
+        double below = 0, belowSum = 0, bestBetween = -1;
+        int threshold = -1;
+        for (int t = 1; t < counts.Length; t++)
+        {
+            below += counts[t - 1];
+            belowSum += (double)(t - 1) * counts[t - 1];
+            double above = n - below;
+            if (below == 0 || above == 0) continue;
+            double meanBelow = belowSum / below, meanAbove = (total - belowSum) / above;
+            double between = below * above * (meanAbove - meanBelow) * (meanAbove - meanBelow);
+            if (between > bestBetween) (bestBetween, threshold) = (between, t);
+        }
+        if (threshold < 0) return null;
+        int brightCount = 0;
+        double brightSum = 0, darkSum = 0;
+        foreach (int p in reference)
+        {
+            int v = ((p >> 16) & 0xFF) + ((p >> 8) & 0xFF) + (p & 0xFF);
+            if (v >= threshold) { brightCount++; brightSum += v; } else darkSum += v;
+        }
+        int darkCount = n - brightCount;
+        if (brightCount == 0 || darkCount == 0) return null;
+        double brightMean = brightSum / brightCount, darkMean = darkSum / darkCount;
+        if (brightMean - darkMean < MinInkContrast) return null;
+        // The split found sits at the edge of one group; judge live pixels halfway between the two,
+        // so a backdrop a little lighter (or darker) than the one snipped still reads as backdrop.
+        threshold = (int)Math.Round((brightMean + darkMean) / 2);
+        bool inkIsBright = brightCount <= darkCount;
+        double inkShare = (double)(inkIsBright ? brightCount : darkCount) / n;
+        if (inkShare < MinInkShare || inkShare > MaxInkShare) return null;
+        var shape = new Shape { Ink = new bool[n], Threshold = threshold, InkIsBright = inkIsBright };
+        for (int i = 0; i < n; i++) shape.Ink[i] = shape.IsInk(reference[i]);
+        return shape;
     }
 
     /// <summary>
@@ -43,25 +123,29 @@ public static class ScreenAnchor
     {
         if (regionWidth < width || regionHeight < height || reference.Length != width * height || region.Length < regionWidth * regionHeight) return null;
         int n = reference.Length;
+        var shape = ShapeOf(reference);
 
+        // Misses by colour, and by shape (see Similarity): the fewer counts.
         int Score(int ox, int oy, int give)
         {
-            int misses = 0;
+            int misses = 0, shapeMisses = shape is null ? int.MaxValue : 0;
             for (int y = 0; y < height; y++)
             {
                 int row = (oy + y) * regionWidth + ox, refRow = y * width;
                 for (int x = 0; x < width; x++)
                 {
                     int a = region[row + x], b = reference[refRow + x];
-                    if (Math.Abs(((a >> 16) & 0xFF) - ((b >> 16) & 0xFF)) > Tolerance
-                        || Math.Abs(((a >> 8) & 0xFF) - ((b >> 8) & 0xFF)) > Tolerance
-                        || Math.Abs((a & 0xFF) - (b & 0xFF)) > Tolerance)
-                    {
-                        if (++misses > give) return misses; // cannot win from here
-                    }
+                    if (misses <= give
+                        && (Math.Abs(((a >> 16) & 0xFF) - ((b >> 16) & 0xFF)) > Tolerance
+                            || Math.Abs(((a >> 8) & 0xFF) - ((b >> 8) & 0xFF)) > Tolerance
+                            || Math.Abs((a & 0xFF) - (b & 0xFF)) > Tolerance))
+                        misses++;
+                    if (shape is not null && shapeMisses <= give && shape.IsInk(a) != shape.Ink[refRow + x])
+                        shapeMisses++;
+                    if (misses > give && shapeMisses > give) return Math.Min(misses, shapeMisses); // cannot win from here
                 }
             }
-            return misses;
+            return Math.Min(misses, shapeMisses);
         }
 
         // Every other position first (a shifted label still matches well one pixel off), then the

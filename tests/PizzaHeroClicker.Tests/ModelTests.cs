@@ -113,13 +113,32 @@ public class ProfileJsonTests
         var live = (int[])reference.Clone();
         Assert.Equal(1.0, PizzaHeroClicker.Services.ScreenAnchor.Similarity(live, reference));
 
-        for (int i = 0; i < 25; i++) live[i] = 0xE04030;                       // a rock covers a quarter of it
-        Assert.Equal(0.75, PizzaHeroClicker.Services.ScreenAnchor.Similarity(live, reference), 2);
+        // A rock covers a quarter of it: the lettering there is lost (the rock is darker than the
+        // lettering, so where it covers backdrop it still reads as backdrop by shape).
+        for (int i = 0; i < 25; i++) live[i] = 0xE04030;
+        Assert.InRange(PizzaHeroClicker.Services.ScreenAnchor.Similarity(live, reference), 0.75, 0.88);
 
         for (int i = 0; i < 100; i++) live[i] = reference[i] == 0xFFFFFF ? 0xF0F0F0 : 0x182840; // slightly different rendering
         Assert.Equal(1.0, PizzaHeroClicker.Services.ScreenAnchor.Similarity(live, reference));
 
-        Assert.True(PizzaHeroClicker.Services.ScreenAnchor.Similarity(new int[100], reference) < 0.05);  // a different screen
+        Assert.True(PizzaHeroClicker.Services.ScreenAnchor.Similarity(new int[100], reference) < 0.6);  // a different screen
+        Assert.True(PizzaHeroClicker.Services.ScreenAnchor.Similarity(Enumerable.Repeat(0xFFFFFF, 100).ToArray(), reference) < 0.6);
+    }
+
+    [Fact]
+    public void AMarkerStillMatchesWhenTheBackdropBehindItsLetteringChanges()
+    {
+        // Light lettering (about a quarter of the marker) on a dark blue backdrop when snipped; later
+        // the game shows a reddish-brown scene behind the same lettering.
+        var reference = new int[400];
+        for (int i = 0; i < 400; i++) reference[i] = i % 4 == 0 ? 0xFAF4F0 : 0x1C344C + (i % 7);
+        var live = new int[400];
+        for (int i = 0; i < 400; i++) live[i] = i % 4 == 0 ? 0xF6F0EE : 0x6A3020 + (i % 5) * 0x030100;
+        Assert.True(PizzaHeroClicker.Services.ScreenAnchor.Similarity(live, reference) >= 0.95);
+
+        // Something else light on that scene, in other places: not the marker.
+        for (int i = 0; i < 400; i++) live[i] = i % 4 == 2 ? 0xF6F0EE : 0x6A3020;
+        Assert.True(PizzaHeroClicker.Services.ScreenAnchor.Similarity(live, reference) < 0.6);
     }
 
     [Fact]
